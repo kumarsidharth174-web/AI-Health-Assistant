@@ -1,21 +1,46 @@
 from google import genai
+from google.genai import types
 import os
 import re
 import json
-import time
 from dotenv import load_dotenv
 
 
+# ==========================================
+# ENVIRONMENT
+# ==========================================
+
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
+raw_key = os.getenv("GEMINI_API_KEY", "")
+api_key = raw_key.strip().strip('"').strip("'")
 
 if not api_key:
-    raise ValueError("GEMINI_API_KEY not found in .env file")
+    raise ValueError("GEMINI_API_KEY not found in environment variables")
+
+print(
+    f"GEMINI_API_KEY loaded, "
+    f"length={len(api_key)}, "
+    f"starts_with={api_key[:6]}***"
+)
 
 
-client = genai.Client(api_key=api_key)
+# ==========================================
+# GEMINI CLIENT
+# ==========================================
 
+# Timeout prevents the request from waiting forever.
+client = genai.Client(
+    api_key=api_key,
+    http_options=types.HttpOptions(
+        timeout=20000
+    )
+)
+
+
+# ==========================================
+# SYSTEM PROMPT
+# ==========================================
 
 SYSTEM_PROMPT = """
 You are an AI Healthcare Assistant.
@@ -38,44 +63,82 @@ IMPORTANT:
 - Do not prescribe dangerous or restricted medicines.
 - Remember the conversation context.
 - The patient may write in Hindi, English or Hinglish
-  (mixed Hindi-English). Reply in the same style/language
-  the patient is using, in a warm and simple tone.
+  (mixed Hindi-English).
+- Reply in the same style/language the patient is using.
+- Keep the response useful, calm and reasonably short.
 """
 
 
-# Current, supported Gemini models.
-# If the first fails, the next is tried automatically.
-MODELS = [
-    "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
+# ==========================================
+# MODEL
+# ==========================================
+
+# Use one model only.
+# This prevents unnecessary API calls when quota is exhausted.
+
+MODEL = os.getenv(
+    "GEMINI_MODEL",
     "gemini-2.5-flash"
-]
+)
 
 
 # ==========================================
-# EMERGENCY KEYWORD DETECTION (runs locally, no API needed)
+# EMERGENCY KEYWORD DETECTION
 # ==========================================
 
 EMERGENCY_PATTERNS = [
-    r"chest pain", r"seene mein dard", r"sine mein dard",
-    r"can'?t breathe", r"cannot breathe", r"difficulty breathing",
-    r"saans nahi", r"saans lene mein takleef",
-    r"unconscious", r"passed out", r"behosh",
-    r"severe bleeding", r"bleeding a lot", r"bahut khoon",
-    r"heart attack", r"dil ka daura",
-    r"stroke", r"paralysis", "lakwa",
-    r"seizure", r"fits", r"mirgi",
-    r"suicide", r"kill myself", r"khudkushi",
-    r"severe burn", r"poisoning", r"zeher",
-    r"choking", r"gala ghut"
+    r"chest pain",
+    r"seene mein dard",
+    r"sine mein dard",
+
+    r"can't breathe",
+    r"cannot breathe",
+    r"difficulty breathing",
+    r"saans nahi",
+    r"saans lene mein takleef",
+
+    r"unconscious",
+    r"passed out",
+    r"behosh",
+
+    r"severe bleeding",
+    r"bleeding a lot",
+    r"bahut khoon",
+
+    r"heart attack",
+    r"dil ka daura",
+
+    r"stroke",
+    r"paralysis",
+    r"lakwa",
+
+    r"seizure",
+    r"fits",
+    r"mirgi",
+
+    r"suicide",
+    r"kill myself",
+    r"khudkushi",
+
+    r"severe burn",
+    r"poisoning",
+    r"zeher",
+
+    r"choking",
+    r"gala ghut"
 ]
 
-EMERGENCY_REGEX = re.compile("|".join(EMERGENCY_PATTERNS), re.IGNORECASE)
+EMERGENCY_REGEX = re.compile(
+    "|".join(EMERGENCY_PATTERNS),
+    re.IGNORECASE
+)
 
 
 def check_emergency(text):
-    """Return True if the message contains wording that could
-    indicate a medical emergency."""
+    """
+    Return True if the message contains wording
+    that could indicate a medical emergency.
+    """
 
     if not text:
         return False
@@ -91,35 +154,97 @@ def friendly_error_message(error_text):
 
     text = str(error_text).lower()
 
-    if "429" in text or "resource_exhausted" in text or "quota" in text:
+    # Gemini quota / rate limit
+    if (
+        "429" in text
+        or "resource_exhausted" in text
+        or "quota" in text
+        or "rate limit" in text
+    ):
         return (
-            "The AI assistant is receiving too many requests right now "
-            "(usage limit reached). Please wait a minute and try again."
+            "The AI assistant has reached its current usage limit. "
+            "Please wait a little while and try again."
         )
 
-    if "404" in text or "not_found" in text or ("model" in text and "not found" in text):
-        return "The AI model is temporarily unavailable. Please try again in a moment."
-
-    if "503" in text or "unavailable" in text:
-        return "The AI service is busy right now. Please try again shortly."
-
-    if "api key" in text or "permission_denied" in text or "unauthenticated" in text or "401" in text or "403" in text:
+    # Model not found
+    if (
+        "404" in text
+        or "not_found" in text
+        or "model not found" in text
+    ):
         return (
-            "The AI service could not be reached because of a "
-            "configuration problem. Please check the server's API key."
+            "The AI model is temporarily unavailable. "
+            "Please try again later."
         )
 
-    if "timeout" in text or "connection" in text or "network" in text:
+    # Service unavailable
+    if (
+        "503" in text
+        or "service unavailable" in text
+        or "temporarily unavailable" in text
+    ):
+        return (
+            "The AI service is busy right now. "
+            "Please try again shortly."
+        )
+
+    # API key / permission
+    if (
+        "api key" in text
+        or "permission_denied" in text
+        or "unauthenticated" in text
+        or "401" in text
+        or "403" in text
+    ):
+        return (
+            "The AI service could not be accessed because "
+            "of an API configuration problem."
+        )
+
+    # Timeout
+    if (
+        "timeout" in text
+        or "timed out" in text
+    ):
+        return (
+            "The AI service took too long to respond. "
+            "Please try again."
+        )
+
+    # Network
+    if (
+        "connection" in text
+        or "network" in text
+    ):
         return (
             "Could not reach the AI service due to a network issue. "
-            "Please check your internet connection and try again."
+            "Please try again."
         )
 
-    return "The AI assistant could not process that right now. Please try again in a few seconds."
+    return (
+        "The AI assistant could not process that right now. "
+        "Please try again in a few seconds."
+    )
 
 
 # ==========================================
-# CHAT RESPONSE (WITH CONVERSATION MEMORY)
+# CHECK QUOTA ERROR
+# ==========================================
+
+def is_quota_error(error):
+
+    text = str(error).lower()
+
+    return (
+        "429" in text
+        or "resource_exhausted" in text
+        or "quota" in text
+        or "rate limit" in text
+    )
+
+
+# ==========================================
+# CHAT RESPONSE
 # ==========================================
 
 def get_ai_response(user_message, previous_messages=None):
@@ -127,10 +252,32 @@ def get_ai_response(user_message, previous_messages=None):
     if previous_messages is None:
         previous_messages = []
 
-    conversation = ""
+    # Safety: make sure user message is not empty
+    user_message = str(user_message or "").strip()
+
+    if not user_message:
+        return "Please tell me what health problem you are experiencing."
+
+    # ======================================
+    # BUILD CONVERSATION
+    # ======================================
+
+    conversation_parts = []
 
     for message in previous_messages:
-        conversation += f"{message['sender']}: {message['message']}\n"
+
+        sender = message.get("sender", "user")
+        text = message.get("message", "")
+
+        conversation_parts.append(
+            f"{sender}: {text}"
+        )
+
+    conversation = "\n".join(conversation_parts)
+
+    # ======================================
+    # BUILD PROMPT
+    # ======================================
 
     prompt = f"""
 {SYSTEM_PROMPT}
@@ -144,33 +291,57 @@ Latest patient message:
 Patient: {user_message}
 
 Respond naturally to the latest message.
-Use the previous conversation when relevant.
+
+Use previous conversation when relevant.
+
+Do not repeat the entire conversation.
+
+Give a helpful response in the same language/style
+as the patient.
 """
 
-    last_error = None
+    # ======================================
+    # ONLY ONE API REQUEST
+    # ======================================
 
-    for model in MODELS:
+    try:
 
-        for attempt in range(2):
+        print(f"Calling Gemini model: {MODEL}")
 
-            try:
-                print(f"Trying {model}, attempt {attempt + 1}")
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=prompt
+        )
 
-                response = client.models.generate_content(
-                    model=model,
-                    contents=prompt
-                )
+        if not response:
+            raise Exception("Empty response from Gemini")
 
-                if response.text:
-                    return response.text
+        text = getattr(response, "text", None)
 
-            except Exception as error:
-                last_error = error
-                print(f"AI ERROR: {model}")
-                print(str(error))
-                time.sleep(1)
+        if text:
+            return text.strip()
 
-    raise Exception(str(last_error))
+        raise Exception("Gemini returned an empty response")
+
+    except Exception as error:
+
+        print("===================================")
+        print("AI ERROR")
+        print(f"Model: {MODEL}")
+        print(f"Error: {error}")
+        print("===================================")
+
+        # IMPORTANT:
+        # If quota is exhausted, immediately stop.
+        # Do NOT try another model.
+        if is_quota_error(error):
+            raise Exception(
+                "GEMINI_QUOTA_EXCEEDED"
+            )
+
+        raise Exception(
+            friendly_error_message(error)
+        )
 
 
 # ==========================================
@@ -191,19 +362,40 @@ def extract_health_info(messages):
     if not messages:
         return default
 
-    conversation = ""
+    # ======================================
+    # BUILD CONVERSATION
+    # ======================================
+
+    conversation_parts = []
 
     for message in messages:
-        conversation += f"{message['sender']}: {message['message']}\n"
+
+        sender = message.get("sender", "user")
+        text = message.get("message", "")
+
+        conversation_parts.append(
+            f"{sender}: {text}"
+        )
+
+    conversation = "\n".join(conversation_parts)
+
+    # ======================================
+    # EXTRACTION PROMPT
+    # ======================================
 
     prompt = f"""
-Read this patient conversation and extract ONLY information the
-patient actually stated. Do not guess or invent anything.
+Read this patient conversation and extract ONLY information
+the patient actually stated.
 
-If a field was not mentioned, use exactly: "Not provided"
+Do not guess or invent anything.
 
-Respond with ONLY valid JSON (no markdown, no extra text) in this
-exact shape:
+If a field was not mentioned, use exactly:
+
+"Not provided"
+
+Respond with ONLY valid JSON.
+
+Required format:
 
 {{
   "symptoms": "...",
@@ -219,24 +411,75 @@ Conversation:
 {conversation}
 """
 
-    for model in MODELS:
+    # ======================================
+    # ONE EXTRACTION REQUEST
+    # ======================================
 
-        try:
-            response = client.models.generate_content(model=model, contents=prompt)
+    try:
 
-            raw_text = response.text.strip()
-            raw_text = re.sub(r"^```json|^```|```$", "", raw_text, flags=re.MULTILINE).strip()
+        print(f"Extracting health information using: {MODEL}")
 
-            data = json.loads(raw_text)
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=prompt
+        )
 
-            for key in default:
-                if key not in data or not data[key]:
-                    data[key] = "Not provided"
+        if not response:
+            return default
 
-            return data
+        raw_text = getattr(response, "text", "")
 
-        except Exception as error:
-            print(f"EXTRACTION ERROR ({model}): {error}")
-            continue
+        if not raw_text:
+            return default
 
-    return default
+        raw_text = raw_text.strip()
+
+        # Remove markdown JSON fences
+        raw_text = re.sub(
+            r"^```json\s*",
+            "",
+            raw_text,
+            flags=re.IGNORECASE
+        )
+
+        raw_text = re.sub(
+            r"^```\s*",
+            "",
+            raw_text
+        )
+
+        raw_text = re.sub(
+            r"\s*```$",
+            "",
+            raw_text
+        )
+
+        raw_text = raw_text.strip()
+
+        data = json.loads(raw_text)
+
+        # ==================================
+        # ENSURE ALL REQUIRED FIELDS EXIST
+        # ==================================
+
+        for key in default:
+
+            if key not in data:
+                data[key] = "Not provided"
+
+            elif not data[key]:
+                data[key] = "Not provided"
+
+        return data
+
+    except Exception as error:
+
+        print("===================================")
+        print("HEALTH EXTRACTION ERROR")
+        print(error)
+        print("===================================")
+
+        # If quota is exhausted, don't retry.
+        # Returning default keeps the server alive.
+
+        return default
