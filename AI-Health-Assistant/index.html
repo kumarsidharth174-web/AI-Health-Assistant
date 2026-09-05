@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        AI Healthcare Assistant
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+</head>
+
+
+<body>
+
+
+<!-- ================= PATIENT SETUP MODAL ================= -->
+<!-- Shown only the first time, so we know who the patient is -->
+
+<div id="profileModal" class="modal-overlay">
+
+    <div class="modal-box">
+
+        <h2>Welcome 👋</h2>
+        <p class="modal-subtitle">
+            Please tell us a bit about yourself before we start.
+            This is saved so your history is not lost.
+        </p>
+
+        <label>Full Name</label>
+        <input type="text" id="profileName" placeholder="e.g. Rohan Sharma">
+
+        <div class="modal-row">
+            <div>
+                <label>Age</label>
+                <input type="number" id="profileAge" placeholder="e.g. 28">
+            </div>
+            <div>
+                <label>Gender</label>
+                <select id="profileGender">
+                    <option value="">Select</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+        </div>
+
+        <label>Phone (optional)</label>
+        <input type="text" id="profilePhone" placeholder="e.g. 98xxxxxxxx">
+
+        <button id="profileSaveBtn" class="primary-button">
+            Start Consultation
+        </button>
+
+        <button id="profileSkipBtn" class="link-button">
+            Continue as Guest
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- ================= HEADER ================= -->
+
+<header class="topbar">
+
+    <div class="brand">
+
+        <div class="brand-icon">
+            ✚
+        </div>
+
+        <div>
+
+            <h1>
+                HealthAI
+            </h1>
+
+            <span>
+                Healthcare Assistant
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <div class="patient-box" id="patientBox" title="Click to edit your profile">
+
+        <div class="patient-avatar" id="patientAvatar">
+            P
+        </div>
+
+        <div>
+
+            <strong id="patientName">
+                Guest Patient
+            </strong>
+
+            <small id="patientMeta">
+                Personal Health
+            </small>
+
+        </div>
+
+    </div>
+
+</header>
+
+
+
+<!-- ================= EMERGENCY BANNER (hidden by default) ================= -->
+
+<div id="emergencyBanner" class="emergency-banner hidden">
+    🚨 <strong>This may be a medical emergency.</strong>
+    Please seek urgent professional medical care immediately or call your local emergency number.
+</div>
+
+
+
+<!-- ================= MAIN ================= -->
+
+<main class="dashboard">
+
+
+    <!-- Welcome -->
+
+    <section class="welcome-card">
+
+        <div>
+
+            <span class="small-title">
+                AI HEALTHCARE
+            </span>
+
+            <h2>
+                How can I help you today?
+            </h2>
+
+            <p>
+                Tell me about your health concern.
+                You can type or speak.
+            </p>
+
+        </div>
+
+
+        <div class="ai-orb">
+            ✦
+        </div>
+
+    </section>
+
+
+
+    <!-- Stats -->
+
+    <section class="stats">
+
+        <div class="stat-card">
+
+            <span>
+                💬
+            </span>
+
+            <div>
+
+                <small>
+                    Conversations
+                </small>
+
+                <strong id="conversationCount">
+                    0
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <div class="stat-card">
+
+            <span>
+                🩺
+            </span>
+
+            <div>
+
+                <small>
+                    Symptoms
+                </small>
+
+                <strong id="symptomStat">
+                    AI Analysis
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <div class="stat-card">
+
+            <span>
+                📋
+            </span>
+
+            <div>
+
+                <small>
+                    Health Report
+                </small>
+
+                <strong>
+                    Ready
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <div class="stat-card">
+
+            <span>
+                🔒
+            </span>
+
+            <div>
+
+                <small>
+                    Session
+                </small>
+
+                <strong>
+                    Private
+                </strong>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- ================= CONTENT ================= -->
+
+    <section class="content-grid">
+
+
+        <!-- LEFT: HISTORY -->
+
+        <aside class="history-panel">
+
+            <div class="card-header">
+                <h3>Patient History</h3>
+            </div>
+
+            <div id="historyList" class="history-list">
+                <p class="empty-note">No previous conversations yet.</p>
+            </div>
+
+        </aside>
+
+
+
+        <!-- CHAT -->
+
+        <div class="chat-card">
+
+            <div class="card-header">
+
+                <div>
+
+                    <h3>
+                        AI Consultation
+                    </h3>
+
+                    <span class="online">
+                        ● AI Assistant Online
+                    </span>
+
+                </div>
+
+
+                <button
+                    id="newChatBtn"
+                    class="small-button"
+                >
+                    + New Chat
+                </button>
+
+            </div>
+
+
+
+            <div
+                id="chatBox"
+                class="chat-box"
+            >
+
+
+                <div class="message ai-message">
+
+                    <div class="message-icon">
+                        AI
+                    </div>
+
+                    <div>
+
+                        <strong>
+                            AI Assistant
+                        </strong>
+
+                        <p>
+                            Hello! I'm your AI Healthcare
+                            Assistant. You can type your
+                            health concern or press the
+                            microphone button to speak.
+                        </p>
+
+                        <button
+                            class="speak-btn"
+                            data-text="Hello! I'm your AI Healthcare Assistant. You can type your health concern or press the microphone button to speak."
+                        >
+                            🔊 Speak
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+            </div>
+
+
+
+            <!-- INPUT -->
+
+            <div class="input-area">
+
+                <input
+                    type="text"
+                    id="userInput"
+                    placeholder="Describe your health concern..."
+                >
+
+
+                <button
+                    id="voiceBtn"
+                    class="voice-button"
+                    title="Speak"
+                >
+                    🎤
+                </button>
+
+
+                <button
+                    id="sendBtn"
+                    class="send-button"
+                >
+                    Send
+                </button>
+
+            </div>
+
+
+            <div
+                id="voiceStatus"
+                class="voice-status"
+            ></div>
+
+
+        </div>
+
+
+
+        <!-- RIGHT PANEL -->
+
+        <aside class="side-panel">
+
+
+            <!-- Emergency -->
+
+            <div class="emergency-card">
+
+                <div class="emergency-title">
+
+                    <span>
+                        🚨
+                    </span>
+
+                    Emergency Care
+
+                </div>
+
+                <p>
+                    If you have severe chest pain,
+                    difficulty breathing, unconsciousness,
+                    severe bleeding or another emergency,
+                    seek urgent medical care.
+                </p>
+
+            </div>
+
+
+
+            <!-- Patient Health Summary -->
+
+            <div class="summary-card">
+
+                <div class="card-header">
+                    <h3>Patient Health Summary</h3>
+                    <span>Live</span>
+                </div>
+
+                <div class="summary-grid" id="summaryGrid">
+
+                    <div class="summary-item">
+                        <small>Symptoms</small>
+                        <strong data-field="symptoms">Not provided</strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <small>Duration</small>
+                        <strong data-field="duration">Not provided</strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <small>Temperature</small>
+                        <strong data-field="temperature">Not provided</strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <small>Severity</small>
+                        <strong data-field="severity">Not provided</strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <small>Medicines</small>
+                        <strong data-field="medicines">Not provided</strong>
+                    </div>
+
+                    <div class="summary-item">
+                        <small>Relevant History</small>
+                        <strong data-field="history">Not provided</strong>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- Report -->
+
+            <div class="report-card">
+
+                <div class="card-header">
+
+                    <h3>
+                        Patient Report
+                    </h3>
+
+                    <span>
+                        AI
+                    </span>
+
+                </div>
+
+
+                <p>
+                    Analyze the saved conversation and
+                    create a health summary.
+                </p>
+
+
+                <button
+                    id="reportBtn"
+                    class="report-button"
+                >
+                    📊 Generate Health Report
+                </button>
+
+
+                <div
+                    id="reportBox"
+                    class="report-box"
+                >
+                </div>
+
+            </div>
+
+
+
+            <!-- Quick actions -->
+
+            <div class="quick-card">
+
+                <h3>
+                    Quick Actions
+                </h3>
+
+
+                <button
+                    class="quick-action"
+                    data-message="I want to describe my symptoms."
+                >
+                    🩺 Describe Symptoms
+                </button>
+
+
+                <button
+                    class="quick-action"
+                    data-message="I want to tell you my temperature."
+                >
+                    🌡️ Temperature
+                </button>
+
+
+                <button
+                    class="quick-action"
+                    data-message="I want to share my medical history."
+                >
+                    📋 Medical History
+                </button>
+
+
+                <button
+                    class="quick-action"
+                    id="quickReportAction"
+                >
+                    📊 Generate Report
+                </button>
+
+
+            </div>
+
+
+        </aside>
+
+
+    </section>
+
+
+</main>
+
+
+<script src="script.js"></script>
+
+</body>
+
+</html>

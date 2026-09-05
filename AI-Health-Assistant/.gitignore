@@ -1,0 +1,12 @@
+.env
+backend/.env
+
+__pycache__/
+*.pyc
+
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+
+.vscode/
+Environment variables / API keys
