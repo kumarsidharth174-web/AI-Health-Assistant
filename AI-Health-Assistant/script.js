@@ -1,6 +1,7 @@
-const API_URL ="https://ai-health-assistant-w6ht.onrender.com";
-
-
+// const API_URL ="https://ai-health-assistant-w6ht.onrender.com";
+const API_URL = "https://ai-healthcare-backend-qiiy.onrender.com";
+// const API_URL = "http://127.0.0.1:5000";
+// https://ai-health-assistant-w6ht.onrender.com
 // ==========================================
 // ELEMENTS
 // ==========================================
@@ -885,7 +886,97 @@ function escapeAttribute(text) {
 
 
 // ==========================================
+// WAKE UP SERVER
+// (Render free tier sleeps after 15 min idle.
+//  First request after that can take 30-50s to
+//  wake up, so instead of failing instantly we
+//  show a message and retry a few times.)
+// ==========================================
+
+function showWakingOverlay(message) {
+
+    let overlay = document.getElementById("wakingOverlay");
+
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "wakingOverlay";
+        overlay.style.position = "fixed";
+        overlay.style.top = "0";
+        overlay.style.left = "0";
+        overlay.style.width = "100%";
+        overlay.style.height = "100%";
+        overlay.style.background = "rgba(0, 0, 0, 0.8)";
+        overlay.style.color = "#ffffff";
+        overlay.style.display = "flex";
+        overlay.style.flexDirection = "column";
+        overlay.style.alignItems = "center";
+        overlay.style.justifyContent = "center";
+        overlay.style.zIndex = "99999";
+        overlay.style.fontFamily = "sans-serif";
+        overlay.style.fontSize = "16px";
+        overlay.style.textAlign = "center";
+        overlay.style.padding = "24px";
+        document.body.appendChild(overlay);
+    }
+
+    overlay.textContent = message;
+}
+
+function hideWakingOverlay() {
+
+    const overlay = document.getElementById("wakingOverlay");
+
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+async function wakeUpServer(maxAttempts = 8, delayMs = 6000) {
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+
+        try {
+
+            showWakingOverlay(
+                attempt === 1
+                    ? "Connecting to server..."
+                    : `Server was asleep, waking it up... (attempt ${attempt}/${maxAttempts})`
+            );
+
+            const response = await fetch(`${API_URL}/`);
+
+            if (response.ok) {
+                hideWakingOverlay();
+                return true;
+            }
+
+        } catch (error) {
+            console.warn(`Wake-up attempt ${attempt} failed:`, error);
+        }
+
+        if (attempt < maxAttempts) {
+            await new Promise(function (resolve) {
+                setTimeout(resolve, delayMs);
+            });
+        }
+    }
+
+    hideWakingOverlay();
+    alert("Could not connect to the server. Please check your internet connection and try again in a minute.");
+    return false;
+}
+
+
+// ==========================================
 // START
 // ==========================================
 
-initPatientProfile();
+(async function start() {
+
+    const isAwake = await wakeUpServer();
+
+    if (isAwake) {
+        await initPatientProfile();
+    }
+
+})();
