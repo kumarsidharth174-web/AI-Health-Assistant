@@ -78,7 +78,7 @@ IMPORTANT:
 
 MODEL = os.getenv(
     "GEMINI_MODEL",
-    "gemini-3.6-flash"
+    "gemini-2.5-flash"
 )
 
 
