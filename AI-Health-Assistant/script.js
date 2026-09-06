@@ -1,5 +1,4 @@
-const API_URL =
-    "http://127.0.0.1:5000";
+const API_URL ="https://ai-health-assistant-w6ht.onrender.com";
 
 
 // ==========================================
@@ -67,7 +66,6 @@ async function initPatientProfile() {
 
     if (patientId) {
 
-        // Already have a saved patient - load their info + history
         await loadPatientInfo();
         await loadHistory();
         await refreshSummary();
@@ -75,7 +73,6 @@ async function initPatientProfile() {
         return;
     }
 
-    // No patient yet - show the setup modal
     profileModal.classList.remove("hidden");
 }
 
@@ -173,7 +170,6 @@ function applyPatientToHeader(patient) {
 }
 
 
-// Click the patient box header to edit profile again
 patientBox.addEventListener("click", function () {
 
     profileName.value = patientNameEl.textContent === "Guest Patient" ? "" : patientNameEl.textContent;
@@ -240,7 +236,6 @@ async function sendMessage() {
             return;
         }
 
-        // Save database IDs (first message creates them)
         saveSession(data.patient_id, data.conversation_id);
 
         addAIMessage(data.reply);
@@ -249,7 +244,6 @@ async function sendMessage() {
             showEmergencyBanner();
         }
 
-        // Refresh the side panels with the latest info
         await loadHistory();
         await refreshSummary();
 
@@ -260,8 +254,8 @@ async function sendMessage() {
         thinking.remove();
 
         addAIMessage(
-            "Unable to connect to the AI server. Please make sure the backend " +
-            "(python server.py) is running on http://127.0.0.1:5000."
+            "Unable to connect to the AI server. Please check your internet connection " +
+            "or try again in a moment."
         );
 
     } finally {
@@ -276,7 +270,10 @@ async function sendMessage() {
 function showEmergencyBanner() {
 
     emergencyBanner.classList.remove("hidden");
+    emergencyBanner.classList.add("shake");
     emergencyBanner.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    setTimeout(() => emergencyBanner.classList.remove("shake"), 700);
 
 }
 
@@ -289,7 +286,7 @@ function addUserMessage(text) {
 
     const div = document.createElement("div");
 
-    div.className = "message user-message";
+    div.className = "message user-message fade-in";
 
     div.innerHTML = `
         <div class="user-bubble">
@@ -313,13 +310,13 @@ function addThinkingMessage() {
 
     const div = document.createElement("div");
 
-    div.className = "message ai-message";
+    div.className = "message ai-message fade-in";
 
     div.innerHTML = `
         <div class="message-icon">AI</div>
         <div class="ai-bubble">
             <strong>AI Assistant</strong>
-            <p>Thinking...</p>
+            <p class="typing-dots"><span></span><span></span><span></span></p>
         </div>
     `;
 
@@ -333,14 +330,14 @@ function addThinkingMessage() {
 
 
 // ==========================================
-// AI MESSAGE
+// AI MESSAGE (auto-speak REMOVED - only speaks on button click now)
 // ==========================================
 
 function addAIMessage(text) {
 
     const div = document.createElement("div");
 
-    div.className = "message ai-message";
+    div.className = "message ai-message fade-in";
 
     div.innerHTML = `
         <div class="message-icon">AI</div>
@@ -363,14 +360,15 @@ function addAIMessage(text) {
 
     scrollChat();
 
-    // Automatically speak the response
-    speakText(text, speakButton);
+    // NOTE: automatic speech-on-arrival removed on purpose.
+    // The AI reply no longer speaks itself - only clicking
+    // "🔊 Speak" plays the voice now.
 
 }
 
 
 // ==========================================
-// SPEECH OUTPUT (prefers Indian English female voice)
+// SPEECH OUTPUT (Indian English female voice)
 // ==========================================
 
 let cachedVoices = [];
@@ -383,20 +381,34 @@ if (window.speechSynthesis) {
 }
 
 
+// Common Indian-English / female voice names across
+// Chrome, Edge, Android and Windows so we catch more matches.
+const INDIAN_FEMALE_NAME_HINTS =
+    /female|woman|zira|heera|priya|veena|raveena|neerja|kalpana|lekha|india/i;
+
+
 function pickVoice() {
 
     const voices = cachedVoices.length ? cachedVoices : window.speechSynthesis.getVoices();
 
+    // 1) Best match: en-IN + sounds female
     let selected = voices.find(
-        v => v.lang === "en-IN" && /female|woman|zira|heera|google/i.test(v.name)
+        v => v.lang === "en-IN" && INDIAN_FEMALE_NAME_HINTS.test(v.name)
     );
 
+    // 2) Any en-IN voice (Google's default en-IN is usually female)
     if (!selected) {
         selected = voices.find(v => v.lang === "en-IN");
     }
 
+    // 3) Any voice with an Indian-sounding female name, any locale
     if (!selected) {
-        selected = voices.find(v => /female|woman/i.test(v.name));
+        selected = voices.find(v => INDIAN_FEMALE_NAME_HINTS.test(v.name));
+    }
+
+    // 4) Fallback: any female-sounding English voice
+    if (!selected) {
+        selected = voices.find(v => /en-/i.test(v.lang) && /female|woman/i.test(v.name));
     }
 
     return selected || null;
@@ -413,8 +425,8 @@ function speakText(text, button) {
     const speech = new SpeechSynthesisUtterance(text);
 
     speech.lang = "en-IN";
-    speech.rate = 0.92;
-    speech.pitch = 1.05;
+    speech.rate = 0.9;
+    speech.pitch = 1.1;
 
     const selectedVoice = pickVoice();
 
@@ -424,14 +436,21 @@ function speakText(text, button) {
 
     if (button) {
         button.textContent = "🔊 Speaking...";
+        button.classList.add("speaking");
     }
 
     speech.onend = function () {
-        if (button) button.textContent = "🔊 Speak";
+        if (button) {
+            button.textContent = "🔊 Speak";
+            button.classList.remove("speaking");
+        }
     };
 
     speech.onerror = function () {
-        if (button) button.textContent = "🔊 Speak";
+        if (button) {
+            button.textContent = "🔊 Speak";
+            button.classList.remove("speaking");
+        }
     };
 
     window.speechSynthesis.speak(speech);
@@ -554,6 +573,7 @@ async function generateReport() {
     reportBtn.disabled = true;
     reportBtn.textContent = "Generating...";
     reportBox.textContent = "AI is analyzing the patient's conversation...";
+    reportBox.classList.add("pulse-loading");
 
     try {
 
@@ -582,6 +602,7 @@ async function generateReport() {
 
     }
 
+    reportBox.classList.remove("pulse-loading");
     reportBtn.disabled = false;
     reportBtn.textContent = "📊 Generate Health Report";
 
@@ -612,7 +633,11 @@ async function refreshSummary() {
 
             const el = summaryGrid.querySelector(`[data-field="${key}"]`);
 
-            if (el) el.textContent = value || "Not provided";
+            if (el && el.textContent !== value) {
+                el.textContent = value || "Not provided";
+                el.classList.add("value-updated");
+                setTimeout(() => el.classList.remove("value-updated"), 900);
+            }
 
         });
 
@@ -677,7 +702,7 @@ newChatBtn.addEventListener("click", async function () {
     }
 
     chatBox.innerHTML = `
-        <div class="message ai-message">
+        <div class="message ai-message fade-in">
             <div class="message-icon">AI</div>
             <div>
                 <strong>AI Assistant</strong>
@@ -721,7 +746,7 @@ async function loadHistory() {
 
             const item = document.createElement("button");
 
-            item.className = "history-item";
+            item.className = "history-item fade-in";
 
             if (String(conv.id) === String(conversationId)) {
                 item.classList.add("active");
@@ -767,7 +792,7 @@ async function openConversation(id) {
 
         if (data.messages.length === 0) {
             chatBox.innerHTML = `
-                <div class="message ai-message">
+                <div class="message ai-message fade-in">
                     <div class="message-icon">AI</div>
                     <div><strong>AI Assistant</strong><p>This conversation has no messages yet.</p></div>
                 </div>
@@ -786,7 +811,6 @@ async function openConversation(id) {
 
         scrollChat();
 
-        // Highlight the selected conversation in the list
         document.querySelectorAll(".history-item").forEach(el => el.classList.remove("active"));
         await loadHistory();
 
@@ -799,13 +823,10 @@ async function openConversation(id) {
 }
 
 
-// Same as addUserMessage/addAIMessage but without re-triggering
-// auto speech, used when loading history from the database.
-
 function addUserMessageSilent(text) {
 
     const div = document.createElement("div");
-    div.className = "message user-message";
+    div.className = "message user-message fade-in";
     div.innerHTML = `<div class="user-bubble"><strong>You</strong><p>${escapeHTML(text)}</p></div>`;
     chatBox.appendChild(div);
 
@@ -815,7 +836,7 @@ function addUserMessageSilent(text) {
 function addAIMessageSilent(text) {
 
     const div = document.createElement("div");
-    div.className = "message ai-message";
+    div.className = "message ai-message fade-in";
     div.innerHTML = `
         <div class="message-icon">AI</div>
         <div class="ai-bubble">
