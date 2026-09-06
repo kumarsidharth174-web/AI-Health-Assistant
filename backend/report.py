@@ -1,47 +1,45 @@
-from google import genai
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
 
 load_dotenv()
 
-api_key = os.getenv("GEMINI_API_KEY")
+# Defensive cleanup: removes accidental quotes or spaces that can
+# get pasted into Render/host dashboards.
+raw_key = os.getenv("OPENAI_API_KEY", "")
+api_key = raw_key.strip().strip('"').strip("'")
 
 if not api_key:
-
-    raise ValueError(
-        "GEMINI_API_KEY not found"
-    )
+    raise ValueError("OPENAI_API_KEY not found")
 
 
-client = genai.Client(
-    api_key=api_key
-)
+client = OpenAI(api_key=api_key)
+
+
+MODELS = [
+    os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+    "gpt-4o-mini",
+    "gpt-4.1-mini"
+]
 
 
 def generate_health_report(messages):
 
     conversation = ""
 
-
     for message in messages:
-
-        sender = message["sender"]
-
-        text = message["message"]
-
-        conversation += (
-            f"{sender}: {text}\n"
-        )
-
+        conversation += f"{message['sender']}: {message['message']}\n"
 
     prompt = f"""
 You are analyzing a patient's conversation
 for an educational healthcare report.
 
 Do NOT diagnose the patient.
+You are not a doctor and this is not medical advice.
 
-Create a clear report with these sections:
+Create a clear report with these sections, using these
+exact numbered headings:
 
 1. Patient Summary
 2. Reported Symptoms
@@ -54,47 +52,40 @@ Create a clear report with these sections:
 9. Information Missing
 
 Use "Not provided" when information is unavailable.
+Do not invent any detail the patient did not mention.
+Keep the language simple and calm.
 
 Conversation:
 
 {conversation}
 """
 
-
-    models = [
-        "gemini-3.6-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.5-flash"
-    ]
-
-
     last_error = None
 
+    tried = set()
 
-    for model in models:
+    for model in MODELS:
+
+        if model in tried:
+            continue
+
+        tried.add(model)
 
         try:
-
-            response = client.models.generate_content(
-
+            response = client.chat.completions.create(
                 model=model,
-
-                contents=prompt
-
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
             )
 
-            return response.text
+            text = response.choices[0].message.content
 
+            if text:
+                return text
 
         except Exception as error:
-
             last_error = error
+            print(f"REPORT ERROR {model}: {error}")
 
-            print(
-                f"REPORT ERROR {model}: {error}"
-            )
-
-
-    raise Exception(
-        f"Report generation failed: {last_error}"
-    )
+    raise Exception(str(last_error))
