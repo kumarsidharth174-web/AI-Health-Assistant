@@ -6,4 +6,4 @@ Flask
 Flask-Cors
 gunicorn
 python-dotenv
-google-genai
+openai
