@@ -11,25 +11,28 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-raw_key = os.getenv("OPENAI_API_KEY", "")
+raw_key = os.getenv("GROQ_API_KEY", "")
 api_key = raw_key.strip().strip('"').strip("'")
 
 if not api_key:
-    raise ValueError("OPENAI_API_KEY not found in environment variables")
+    raise ValueError("GROQ_API_KEY not found in environment variables")
 
 print(
-    f"OPENAI_API_KEY loaded, "
+    f"GROQ_API_KEY loaded, "
     f"length={len(api_key)}, "
     f"starts_with={api_key[:6]}***"
 )
 
 
 # ==========================================
-# OPENAI CLIENT
+# GROQ CLIENT
+# (Groq's API is OpenAI-compatible, so we reuse
+#  the OpenAI SDK and just point it at Groq's URL)
 # ==========================================
 
 client = OpenAI(
     api_key=api_key,
+    base_url="https://api.groq.com/openai/v1",
     timeout=20.0
 )
 
@@ -73,8 +76,8 @@ IMPORTANT:
 # This prevents unnecessary API calls when quota is exhausted.
 
 MODEL = os.getenv(
-    "OPENAI_MODEL",
-    "gpt-4o-mini"
+    "GROQ_MODEL",
+    "llama-3.3-70b-versatile"
 )
 
 
@@ -406,8 +409,7 @@ Conversation:
             model=MODEL,
             messages=[
                 {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"}
+            ]
         )
 
         if not response or not response.choices:
