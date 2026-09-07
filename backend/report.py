@@ -7,20 +7,23 @@ load_dotenv()
 
 # Defensive cleanup: removes accidental quotes or spaces that can
 # get pasted into Render/host dashboards.
-raw_key = os.getenv("OPENAI_API_KEY", "")
+raw_key = os.getenv("GROQ_API_KEY", "")
 api_key = raw_key.strip().strip('"').strip("'")
 
 if not api_key:
-    raise ValueError("OPENAI_API_KEY not found")
+    raise ValueError("GROQ_API_KEY not found")
 
 
-client = OpenAI(api_key=api_key)
+client = OpenAI(
+    api_key=api_key,
+    base_url="https://api.groq.com/openai/v1"
+)
 
 
 MODELS = [
-    os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-    "gpt-4o-mini",
-    "gpt-4.1-mini"
+    os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant"
 ]
 
 
