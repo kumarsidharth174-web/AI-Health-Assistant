@@ -1,4 +1,4 @@
-from google import genai
+from openai import OpenAI
 import os
 from dotenv import load_dotenv
 
@@ -7,20 +7,20 @@ load_dotenv()
 
 # Defensive cleanup: removes accidental quotes or spaces that can
 # get pasted into Render/host dashboards.
-raw_key = os.getenv("GEMINI_API_KEY", "")
+raw_key = os.getenv("OPENAI_API_KEY", "")
 api_key = raw_key.strip().strip('"').strip("'")
 
 if not api_key:
-    raise ValueError("GEMINI_API_KEY not found")
+    raise ValueError("OPENAI_API_KEY not found")
 
 
-client = genai.Client(api_key=api_key)
+client = OpenAI(api_key=api_key)
 
 
 MODELS = [
-    "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-2.5-flash"
+    os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+    "gpt-4o-mini",
+    "gpt-4.1-mini"
 ]
 
 
@@ -62,13 +62,27 @@ Conversation:
 
     last_error = None
 
+    tried = set()
+
     for model in MODELS:
 
-        try:
-            response = client.models.generate_content(model=model, contents=prompt)
+        if model in tried:
+            continue
 
-            if response.text:
-                return response.text
+        tried.add(model)
+
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+
+            text = response.choices[0].message.content
+
+            if text:
+                return text
 
         except Exception as error:
             last_error = error
