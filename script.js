@@ -1,5 +1,5 @@
 // const API_URL ="https://ai-health-assistant-w6ht.onrender.com";
-const API_URL = "https://ai-health-assistant-8.onrender.com";
+const API_URL = "https://ai-health-assistant-7-xdrs.onrender.com";
 // const API_URL = "http://127.0.0.1:5000";
 // https://ai-health-assistant-w6ht.onrender.com
 // ==========================================
