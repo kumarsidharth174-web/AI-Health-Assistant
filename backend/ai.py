@@ -1,5 +1,4 @@
-from google import genai
-from google.genai import types
+from openai import OpenAI
 import os
 import re
 import json
@@ -12,29 +11,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-raw_key = os.getenv("GEMINI_API_KEY", "")
+raw_key = os.getenv("OPENAI_API_KEY", "")
 api_key = raw_key.strip().strip('"').strip("'")
 
 if not api_key:
-    raise ValueError("GEMINI_API_KEY not found in environment variables")
+    raise ValueError("OPENAI_API_KEY not found in environment variables")
 
 print(
-    f"GEMINI_API_KEY loaded, "
+    f"OPENAI_API_KEY loaded, "
     f"length={len(api_key)}, "
     f"starts_with={api_key[:6]}***"
 )
 
 
 # ==========================================
-# GEMINI CLIENT
+# OPENAI CLIENT
 # ==========================================
 
-# Timeout prevents the request from waiting forever.
-client = genai.Client(
+client = OpenAI(
     api_key=api_key,
-    http_options=types.HttpOptions(
-        timeout=20000
-    )
+    timeout=20.0
 )
 
 
@@ -77,8 +73,8 @@ IMPORTANT:
 # This prevents unnecessary API calls when quota is exhausted.
 
 MODEL = os.getenv(
-    "GEMINI_MODEL",
-    "gemini-2.5-flash"
+    "OPENAI_MODEL",
+    "gpt-4o-mini"
 )
 
 
@@ -154,12 +150,13 @@ def friendly_error_message(error_text):
 
     text = str(error_text).lower()
 
-    # Gemini quota / rate limit
+    # OpenAI quota / rate limit
     if (
         "429" in text
         or "resource_exhausted" in text
         or "quota" in text
         or "rate limit" in text
+        or "insufficient_quota" in text
     ):
         return (
             "The AI assistant has reached its current usage limit. "
@@ -171,6 +168,7 @@ def friendly_error_message(error_text):
         "404" in text
         or "not_found" in text
         or "model not found" in text
+        or "does not exist" in text
     ):
         return (
             "The AI model is temporarily unavailable. "
@@ -193,6 +191,7 @@ def friendly_error_message(error_text):
         "api key" in text
         or "permission_denied" in text
         or "unauthenticated" in text
+        or "incorrect api key" in text
         or "401" in text
         or "403" in text
     ):
@@ -240,6 +239,7 @@ def is_quota_error(error):
         or "resource_exhausted" in text
         or "quota" in text
         or "rate limit" in text
+        or "insufficient_quota" in text
     )
 
 
@@ -259,46 +259,29 @@ def get_ai_response(user_message, previous_messages=None):
         return "Please tell me what health problem you are experiencing."
 
     # ======================================
-    # BUILD CONVERSATION
+    # BUILD CONVERSATION AS CHAT MESSAGES
     # ======================================
 
-    conversation_parts = []
+    chat_messages = [
+        {"role": "system", "content": SYSTEM_PROMPT}
+    ]
 
     for message in previous_messages:
 
-        sender = message.get("sender", "user")
+        sender = message.get("sender", "patient")
         text = message.get("message", "")
 
-        conversation_parts.append(
-            f"{sender}: {text}"
-        )
+        role = "assistant" if sender == "ai" else "user"
 
-    conversation = "\n".join(conversation_parts)
+        chat_messages.append({
+            "role": role,
+            "content": text
+        })
 
-    # ======================================
-    # BUILD PROMPT
-    # ======================================
-
-    prompt = f"""
-{SYSTEM_PROMPT}
-
-Previous patient conversation:
-
-{conversation}
-
-Latest patient message:
-
-Patient: {user_message}
-
-Respond naturally to the latest message.
-
-Use previous conversation when relevant.
-
-Do not repeat the entire conversation.
-
-Give a helpful response in the same language/style
-as the patient.
-"""
+    chat_messages.append({
+        "role": "user",
+        "content": user_message
+    })
 
     # ======================================
     # ONLY ONE API REQUEST
@@ -306,22 +289,22 @@ as the patient.
 
     try:
 
-        print(f"Calling Gemini model: {MODEL}")
+        print(f"Calling OpenAI model: {MODEL}")
 
-        response = client.models.generate_content(
+        response = client.chat.completions.create(
             model=MODEL,
-            contents=prompt
+            messages=chat_messages
         )
 
-        if not response:
-            raise Exception("Empty response from Gemini")
+        if not response or not response.choices:
+            raise Exception("Empty response from OpenAI")
 
-        text = getattr(response, "text", None)
+        text = response.choices[0].message.content
 
         if text:
             return text.strip()
 
-        raise Exception("Gemini returned an empty response")
+        raise Exception("OpenAI returned an empty response")
 
     except Exception as error:
 
@@ -336,7 +319,7 @@ as the patient.
         # Do NOT try another model.
         if is_quota_error(error):
             raise Exception(
-                "GEMINI_QUOTA_EXCEEDED"
+                "OPENAI_QUOTA_EXCEEDED"
             )
 
         raise Exception(
@@ -419,22 +402,25 @@ Conversation:
 
         print(f"Extracting health information using: {MODEL}")
 
-        response = client.models.generate_content(
+        response = client.chat.completions.create(
             model=MODEL,
-            contents=prompt
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}
         )
 
-        if not response:
+        if not response or not response.choices:
             return default
 
-        raw_text = getattr(response, "text", "")
+        raw_text = response.choices[0].message.content
 
         if not raw_text:
             return default
 
         raw_text = raw_text.strip()
 
-        # Remove markdown JSON fences
+        # Remove markdown JSON fences (safety net)
         raw_text = re.sub(
             r"^```json\s*",
             "",
