@@ -1,9 +1,7 @@
-# flask
-# flask-cors
-# python-dotenv
-# google-genai
+
 Flask
 Flask-Cors
 gunicorn
 python-dotenv
+google-genai
 openai
