@@ -4,7 +4,6 @@ import re
 import json
 from dotenv import load_dotenv
 
-
 # ==========================================
 # ENVIRONMENT
 # ==========================================
@@ -15,7 +14,9 @@ raw_key = os.getenv("GROQ_API_KEY", "")
 api_key = raw_key.strip().strip('"').strip("'")
 
 if not api_key:
-    raise ValueError("GROQ_API_KEY not found in environment variables")
+    raise ValueError(
+        "GROQ_API_KEY not found in environment variables"
+    )
 
 print(
     f"GROQ_API_KEY loaded, "
@@ -23,19 +24,23 @@ print(
     f"starts_with={api_key[:6]}***"
 )
 
-
 # ==========================================
 # GROQ CLIENT
-# (Groq's API is OpenAI-compatible, so we reuse
-#  the OpenAI SDK and just point it at Groq's URL)
 # ==========================================
 
 client = OpenAI(
     api_key=api_key,
     base_url="https://api.groq.com/openai/v1",
-    timeout=20.0
+    timeout=30.0
 )
 
+# ==========================================
+# MODEL
+# ==========================================
+
+MODEL = "llama-3.3-70b-versatile"
+
+print(f"GROQ MODEL: {MODEL}")
 
 # ==========================================
 # SYSTEM PROMPT
@@ -61,68 +66,44 @@ IMPORTANT:
   clearly recommend urgent medical care.
 - Do not prescribe dangerous or restricted medicines.
 - Remember the conversation context.
-- The patient may write in Hindi, English or Hinglish
-  (mixed Hindi-English).
+- The patient may write in Hindi, English or Hinglish.
 - Reply in the same style/language the patient is using.
 - Keep the response useful, calm and reasonably short.
 """
 
-
 # ==========================================
-# MODEL
-# ==========================================
-
-# Use one model only.
-# This prevents unnecessary API calls when quota is exhausted.
-
-MODEL = os.getenv(
-    "GROQ_MODEL",
-    "llama-3.3-70b-versatile"
-)
-
-
-# ==========================================
-# EMERGENCY KEYWORD DETECTION
+# EMERGENCY DETECTION
 # ==========================================
 
 EMERGENCY_PATTERNS = [
     r"chest pain",
     r"seene mein dard",
     r"sine mein dard",
-
     r"can't breathe",
     r"cannot breathe",
     r"difficulty breathing",
     r"saans nahi",
     r"saans lene mein takleef",
-
     r"unconscious",
     r"passed out",
     r"behosh",
-
     r"severe bleeding",
     r"bleeding a lot",
     r"bahut khoon",
-
     r"heart attack",
     r"dil ka daura",
-
     r"stroke",
     r"paralysis",
     r"lakwa",
-
     r"seizure",
     r"fits",
     r"mirgi",
-
     r"suicide",
     r"kill myself",
     r"khudkushi",
-
     r"severe burn",
     r"poisoning",
     r"zeher",
-
     r"choking",
     r"gala ghut"
 ]
@@ -134,11 +115,6 @@ EMERGENCY_REGEX = re.compile(
 
 
 def check_emergency(text):
-    """
-    Return True if the message contains wording
-    that could indicate a medical emergency.
-    """
-
     if not text:
         return False
 
@@ -146,64 +122,47 @@ def check_emergency(text):
 
 
 # ==========================================
-# FRIENDLY ERROR MESSAGES
+# FRIENDLY ERROR
 # ==========================================
 
-def friendly_error_message(error_text):
+def friendly_error_message(error):
 
-    text = str(error_text).lower()
+    text = str(error).lower()
 
-    # OpenAI quota / rate limit
     if (
         "429" in text
-        or "resource_exhausted" in text
         or "quota" in text
         or "rate limit" in text
-        or "insufficient_quota" in text
+        or "too many requests" in text
     ):
         return (
             "The AI assistant has reached its current usage limit. "
             "Please wait a little while and try again."
         )
 
-    # Model not found
     if (
-        "404" in text
-        or "not_found" in text
-        or "model not found" in text
-        or "does not exist" in text
-    ):
-        return (
-            "The AI model is temporarily unavailable. "
-            "Please try again later."
-        )
-
-    # Service unavailable
-    if (
-        "503" in text
-        or "service unavailable" in text
-        or "temporarily unavailable" in text
-    ):
-        return (
-            "The AI service is busy right now. "
-            "Please try again shortly."
-        )
-
-    # API key / permission
-    if (
-        "api key" in text
-        or "permission_denied" in text
-        or "unauthenticated" in text
-        or "incorrect api key" in text
-        or "401" in text
+        "401" in text
         or "403" in text
+        or "api key" in text
+        or "authentication" in text
+        or "unauthorized" in text
     ):
         return (
             "The AI service could not be accessed because "
             "of an API configuration problem."
         )
 
-    # Timeout
+    if (
+        "404" in text
+        or "model not found" in text
+        or "does not exist" in text
+        or "not_found" in text
+    ):
+        return (
+            "The AI model is temporarily unavailable. "
+            "Please try again later."
+        )
+
     if (
         "timeout" in text
         or "timed out" in text
@@ -213,7 +172,6 @@ def friendly_error_message(error_text):
             "Please try again."
         )
 
-    # Network
     if (
         "connection" in text
         or "network" in text
@@ -230,23 +188,6 @@ def friendly_error_message(error_text):
 
 
 # ==========================================
-# CHECK QUOTA ERROR
-# ==========================================
-
-def is_quota_error(error):
-
-    text = str(error).lower()
-
-    return (
-        "429" in text
-        or "resource_exhausted" in text
-        or "quota" in text
-        or "rate limit" in text
-        or "insufficient_quota" in text
-    )
-
-
-# ==========================================
 # CHAT RESPONSE
 # ==========================================
 
@@ -255,31 +196,47 @@ def get_ai_response(user_message, previous_messages=None):
     if previous_messages is None:
         previous_messages = []
 
-    # Safety: make sure user message is not empty
     user_message = str(user_message or "").strip()
 
     if not user_message:
-        return "Please tell me what health problem you are experiencing."
-
-    # ======================================
-    # BUILD CONVERSATION AS CHAT MESSAGES
-    # ======================================
+        return (
+            "Please tell me what health problem "
+            "you are experiencing."
+        )
 
     chat_messages = [
-        {"role": "system", "content": SYSTEM_PROMPT}
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        }
     ]
+
+    # ======================================
+    # PREVIOUS CONVERSATION
+    # ======================================
 
     for message in previous_messages:
 
         sender = message.get("sender", "patient")
         text = message.get("message", "")
 
-        role = "assistant" if sender == "ai" else "user"
+        if not text:
+            continue
+
+        role = (
+            "assistant"
+            if sender == "ai"
+            else "user"
+        )
 
         chat_messages.append({
             "role": role,
-            "content": text
+            "content": str(text)
         })
+
+    # ======================================
+    # CURRENT USER MESSAGE
+    # ======================================
 
     chat_messages.append({
         "role": "user",
@@ -287,47 +244,58 @@ def get_ai_response(user_message, previous_messages=None):
     })
 
     # ======================================
-    # ONLY ONE API REQUEST
+    # GROQ REQUEST
     # ======================================
 
     try:
 
-        print(f"Calling OpenAI model: {MODEL}")
+        print("\n======================================")
+        print("GROQ REQUEST STARTED")
+        print(f"MODEL: {MODEL}")
+        print(f"MESSAGE: {user_message}")
+        print("======================================")
 
         response = client.chat.completions.create(
             model=MODEL,
-            messages=chat_messages
+            messages=chat_messages,
+            temperature=0.4,
+            max_tokens=700
         )
 
-        if not response or not response.choices:
-            raise Exception("Empty response from OpenAI")
+        print("GROQ RESPONSE RECEIVED")
+
+        if not response:
+            raise Exception(
+                "Groq returned an empty response object"
+            )
+
+        if not response.choices:
+            raise Exception(
+                "Groq returned no choices"
+            )
 
         text = response.choices[0].message.content
 
-        if text:
-            return text.strip()
+        if not text:
+            raise Exception(
+                "Groq returned empty message content"
+            )
 
-        raise Exception("OpenAI returned an empty response")
+        print("GROQ REQUEST SUCCESS")
+        print("======================================\n")
+
+        return text.strip()
 
     except Exception as error:
 
-        print("===================================")
-        print("AI ERROR")
-        print(f"Model: {MODEL}")
-        print(f"Error: {error}")
-        print("===================================")
+        print("\n======================================")
+        print("GROQ API ERROR")
+        print("======================================")
+        print("ERROR TYPE:", type(error).__name__)
+        print("ERROR:", str(error))
+        print("======================================\n")
 
-        # IMPORTANT:
-        # If quota is exhausted, immediately stop.
-        # Do NOT try another model.
-        if is_quota_error(error):
-            raise Exception(
-                "OPENAI_QUOTA_EXCEEDED"
-            )
-
-        raise Exception(
-            friendly_error_message(error)
-        )
+        raise
 
 
 # ==========================================
@@ -348,26 +316,28 @@ def extract_health_info(messages):
     if not messages:
         return default
 
-    # ======================================
-    # BUILD CONVERSATION
-    # ======================================
-
     conversation_parts = []
 
     for message in messages:
 
-        sender = message.get("sender", "user")
-        text = message.get("message", "")
-
-        conversation_parts.append(
-            f"{sender}: {text}"
+        sender = message.get(
+            "sender",
+            "patient"
         )
 
-    conversation = "\n".join(conversation_parts)
+        text = message.get(
+            "message",
+            ""
+        )
 
-    # ======================================
-    # EXTRACTION PROMPT
-    # ======================================
+        if text:
+            conversation_parts.append(
+                f"{sender}: {text}"
+            )
+
+    conversation = "\n".join(
+        conversation_parts
+    )
 
     prompt = f"""
 Read this patient conversation and extract ONLY information
@@ -397,32 +367,37 @@ Conversation:
 {conversation}
 """
 
-    # ======================================
-    # ONE EXTRACTION REQUEST
-    # ======================================
-
     try:
 
-        print(f"Extracting health information using: {MODEL}")
+        print(
+            f"Extracting health information using {MODEL}"
+        )
 
         response = client.chat.completions.create(
             model=MODEL,
             messages=[
-                {"role": "user", "content": prompt}
-            ]
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0,
+            max_tokens=500
         )
 
         if not response or not response.choices:
             return default
 
-        raw_text = response.choices[0].message.content
+        raw_text = (
+            response.choices[0]
+            .message.content
+        )
 
         if not raw_text:
             return default
 
         raw_text = raw_text.strip()
 
-        # Remove markdown JSON fences (safety net)
         raw_text = re.sub(
             r"^```json\s*",
             "",
@@ -446,10 +421,6 @@ Conversation:
 
         data = json.loads(raw_text)
 
-        # ==================================
-        # ENSURE ALL REQUIRED FIELDS EXIST
-        # ==================================
-
         for key in default:
 
             if key not in data:
@@ -462,12 +433,10 @@ Conversation:
 
     except Exception as error:
 
-        print("===================================")
+        print("\n======================================")
         print("HEALTH EXTRACTION ERROR")
-        print(error)
-        print("===================================")
-
-        # If quota is exhausted, don't retry.
-        # Returning default keeps the server alive.
+        print("======================================")
+        print("ERROR:", str(error))
+        print("======================================\n")
 
         return default
