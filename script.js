@@ -145,9 +145,22 @@ async function createPatientProfile(profile) {
 
 async function loadPatientInfo() {
 
+    if (!patientId) return;
+
     try {
 
         const response = await fetch(`${API_URL}/patient/${patientId}`);
+
+        if (response.status === 404) {
+            // The saved patient no longer exists on the server
+            // (e.g. Render's free-tier database reset). Clear the
+            // stale session so a fresh patient gets created instead
+            // of repeatedly hitting a 404.
+            console.warn("Saved patient not found on server, starting a fresh session.");
+            clearLocalSession();
+            return;
+        }
+
         const data = await response.json();
 
         if (response.ok && data.patient) {
@@ -159,6 +172,17 @@ async function loadPatientInfo() {
         console.error("Could not load patient info:", error);
 
     }
+
+}
+
+
+function clearLocalSession() {
+
+    patientId = null;
+    conversationId = null;
+
+    localStorage.removeItem("patient_id");
+    localStorage.removeItem("conversation_id");
 
 }
 
