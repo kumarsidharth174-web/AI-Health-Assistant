@@ -1,5 +1,4 @@
 // const API_URL ="https://ai-health-assistant-w6ht.onrender.com";
-// const API_URL = "https://ai-healthcare-backend-qiiy.onrender.com";
 const API_URL = "https://ai-health-assistant-7-xdrs.onrender.com";
 // const API_URL = "http://127.0.0.1:5000";
 // https://ai-health-assistant-w6ht.onrender.com
@@ -35,6 +34,18 @@ const patientMetaEl = document.getElementById("patientMeta");
 const patientAvatarEl = document.getElementById("patientAvatar");
 
 const quickReportAction = document.getElementById("quickReportAction");
+
+const attachBtn = document.getElementById("attachBtn");
+const attachMenu = document.getElementById("attachMenu");
+const attachGalleryBtn = document.getElementById("attachGalleryBtn");
+const attachCameraBtn = document.getElementById("attachCameraBtn");
+const galleryInput = document.getElementById("galleryInput");
+const cameraInput = document.getElementById("cameraInput");
+const imagePreviewArea = document.getElementById("imagePreviewArea");
+const imagePreviewThumb = document.getElementById("imagePreviewThumb");
+const removeImageBtn = document.getElementById("removeImageBtn");
+
+let selectedImageFile = null;
 
 
 // ==========================================
@@ -188,11 +199,104 @@ sendBtn.addEventListener("click", sendMessage);
 
 userInput.addEventListener("keydown", function (event) {
 
-    if (event.key === "Enter") {
+    if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
         sendMessage();
     }
 
+    // Shift+Enter: let the browser insert a newline normally,
+    // then resize the textarea to fit the new line.
+    if (event.key === "Enter" && event.shiftKey) {
+        setTimeout(autoResizeUserInput, 0);
+    }
+
 });
+
+userInput.addEventListener("input", autoResizeUserInput);
+
+function autoResizeUserInput() {
+    userInput.style.height = "auto";
+    userInput.style.height = Math.min(userInput.scrollHeight, 140) + "px";
+}
+
+
+// ==========================================
+// ATTACH REPORT PHOTO (Gallery / Camera)
+// ==========================================
+
+attachBtn.addEventListener("click", function (event) {
+    event.stopPropagation();
+    attachMenu.classList.toggle("hidden");
+});
+
+document.addEventListener("click", function (event) {
+    if (
+        !attachMenu.contains(event.target) &&
+        event.target !== attachBtn
+    ) {
+        attachMenu.classList.add("hidden");
+    }
+});
+
+attachGalleryBtn.addEventListener("click", function () {
+    attachMenu.classList.add("hidden");
+    galleryInput.click();
+});
+
+attachCameraBtn.addEventListener("click", function () {
+    attachMenu.classList.add("hidden");
+    cameraInput.click();
+});
+
+galleryInput.addEventListener("change", function () {
+    handleImageSelected(galleryInput.files[0]);
+    galleryInput.value = "";
+});
+
+cameraInput.addEventListener("change", function () {
+    handleImageSelected(cameraInput.files[0]);
+    cameraInput.value = "";
+});
+
+
+function handleImageSelected(file) {
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+        alert("Please select an image file.");
+        return;
+    }
+
+    const maxSizeBytes = 15 * 1024 * 1024;
+
+    if (file.size > maxSizeBytes) {
+        alert("Image is too large. Please choose a photo under 15MB.");
+        return;
+    }
+
+    selectedImageFile = file;
+
+    imagePreviewThumb.src = URL.createObjectURL(file);
+    imagePreviewArea.classList.remove("hidden");
+
+    userInput.placeholder = "Add a note about this report (optional)...";
+}
+
+
+removeImageBtn.addEventListener("click", function () {
+    clearSelectedImage();
+});
+
+
+function clearSelectedImage() {
+
+    selectedImageFile = null;
+    imagePreviewThumb.src = "";
+    imagePreviewArea.classList.add("hidden");
+    userInput.placeholder = "Describe your health concern...";
+
+}
 
 
 // ==========================================
@@ -201,6 +305,11 @@ userInput.addEventListener("keydown", function (event) {
 
 async function sendMessage() {
 
+    if (selectedImageFile) {
+        await sendImageMessage();
+        return;
+    }
+
     const message = userInput.value.trim();
 
     if (!message) return;
@@ -208,6 +317,7 @@ async function sendMessage() {
     addUserMessage(message);
 
     userInput.value = "";
+    autoResizeUserInput();
 
     sendBtn.disabled = true;
 
@@ -269,6 +379,80 @@ async function sendMessage() {
 }
 
 
+// ==========================================
+// SEND MESSAGE WITH REPORT IMAGE
+// ==========================================
+
+async function sendImageMessage() {
+
+    const file = selectedImageFile;
+    const caption = userInput.value.trim();
+
+    addUserImageMessage(file, caption);
+
+    clearSelectedImage();
+    userInput.value = "";
+    autoResizeUserInput();
+
+    sendBtn.disabled = true;
+
+    const thinking = addThinkingMessage();
+
+    try {
+
+        const formData = new FormData();
+
+        formData.append("image", file);
+        formData.append("message", caption);
+
+        if (patientId) formData.append("patient_id", patientId);
+        if (conversationId) formData.append("conversation_id", conversationId);
+
+        const response = await fetch(`${API_URL}/chat-image`, {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        thinking.remove();
+
+        if (!response.ok) {
+            addAIMessage(data.reply || "Could not analyze the report. Please try again.");
+            return;
+        }
+
+        saveSession(data.patient_id, data.conversation_id);
+
+        addAIMessage(data.reply);
+
+        if (data.emergency) {
+            showEmergencyBanner();
+        }
+
+        await loadHistory();
+        await refreshSummary();
+
+    } catch (error) {
+
+        console.error(error);
+
+        thinking.remove();
+
+        addAIMessage(
+            "Unable to upload the report right now. Please check your internet connection " +
+            "and try again."
+        );
+
+    } finally {
+
+        sendBtn.disabled = false;
+
+    }
+
+}
+
+
 function showEmergencyBanner() {
 
     emergencyBanner.classList.remove("hidden");
@@ -294,6 +478,33 @@ function addUserMessage(text) {
         <div class="user-bubble">
             <strong>You</strong>
             <p>${escapeHTML(text)}</p>
+        </div>
+    `;
+
+    chatBox.appendChild(div);
+
+    scrollChat();
+
+}
+
+
+// ==========================================
+// USER IMAGE MESSAGE (report photo upload)
+// ==========================================
+
+function addUserImageMessage(file, caption) {
+
+    const div = document.createElement("div");
+
+    div.className = "message user-message fade-in";
+
+    const imageUrl = URL.createObjectURL(file);
+
+    div.innerHTML = `
+        <div class="user-bubble user-image-bubble">
+            <strong>You</strong>
+            <img src="${imageUrl}" alt="Uploaded report">
+            ${caption ? `<p>${escapeHTML(caption)}</p>` : ""}
         </div>
     `;
 
@@ -388,6 +599,11 @@ if (window.speechSynthesis) {
 const INDIAN_FEMALE_NAME_HINTS =
     /female|woman|zira|heera|priya|veena|raveena|neerja|kalpana|lekha|india/i;
 
+// Known MALE voice names we must never fall back to
+// (e.g. Windows' default en-IN voice is often "Microsoft Ravi" - male).
+const MALE_NAME_HINTS =
+    /\bravi\b|hemant|prabhat|madhur|\bmale\b|\bman\b/i;
+
 
 function pickVoice() {
 
@@ -398,9 +614,12 @@ function pickVoice() {
         v => v.lang === "en-IN" && INDIAN_FEMALE_NAME_HINTS.test(v.name)
     );
 
-    // 2) Any en-IN voice (Google's default en-IN is usually female)
+    // 2) Any en-IN voice that is NOT a known male voice
+    //    (avoids picking "Microsoft Ravi" or similar by accident)
     if (!selected) {
-        selected = voices.find(v => v.lang === "en-IN");
+        selected = voices.find(
+            v => v.lang === "en-IN" && !MALE_NAME_HINTS.test(v.name)
+        );
     }
 
     // 3) Any voice with an Indian-sounding female name, any locale
@@ -408,9 +627,15 @@ function pickVoice() {
         selected = voices.find(v => INDIAN_FEMALE_NAME_HINTS.test(v.name));
     }
 
-    // 4) Fallback: any female-sounding English voice
+    // 4) Any female-sounding English voice, any locale
     if (!selected) {
         selected = voices.find(v => /en-/i.test(v.lang) && /female|woman/i.test(v.name));
+    }
+
+    // 5) Last resort: any en-IN voice at all, even if we can't confirm
+    //    gender - but still skip it if it's a confirmed male voice.
+    if (!selected) {
+        selected = voices.find(v => v.lang === "en-IN" && !MALE_NAME_HINTS.test(v.name));
     }
 
     return selected || null;
