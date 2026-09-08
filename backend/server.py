@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import traceback
+import base64
 import os
 
 import database
@@ -8,53 +9,30 @@ import ai
 import report
 
 
-# ==========================================
-# FLASK APP
-# ==========================================
-
 app = Flask(__name__)
-
-CORS(
-    app,
-    resources={
-        r"/*": {
-            "origins": "*"
-        }
-    }
-)
+CORS(app)
 
 
 # ==========================================
 # HOME / HEALTH CHECK
 # ==========================================
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
-
-    print("GET / received")
-
     return "AI Healthcare Assistant Backend is Running!"
 
 
 # ==========================================
-# CREATE PATIENT
+# CREATE PATIENT PROFILE
 # ==========================================
 
 @app.route("/patient", methods=["POST"])
 def create_patient():
 
     try:
+        data = request.get_json() or {}
 
-        print("POST /patient received")
-
-        data = request.get_json(
-            silent=True
-        ) or {}
-
-        name = data.get(
-            "name"
-        ) or "Guest Patient"
-
+        name = data.get("name") or "Guest Patient"
         age = data.get("age")
         gender = data.get("gender")
         phone = data.get("phone")
@@ -68,16 +46,12 @@ def create_patient():
 
         return jsonify({
             "patient_id": patient_id,
-            "patient": database.get_patient(
-                patient_id
-            )
+            "patient": database.get_patient(patient_id)
         })
 
     except Exception:
-
-        print("\n========== PATIENT ERROR ==========")
+        print("\n===== /patient ERROR =====")
         traceback.print_exc()
-        print("===================================\n")
 
         return jsonify({
             "error": "Could not create patient profile."
@@ -88,20 +62,13 @@ def create_patient():
 # GET PATIENT
 # ==========================================
 
-@app.route(
-    "/patient/<int:patient_id>",
-    methods=["GET"]
-)
+@app.route("/patient/<int:patient_id>", methods=["GET"])
 def get_patient(patient_id):
 
     try:
-
-        patient = database.get_patient(
-            patient_id
-        )
+        patient = database.get_patient(patient_id)
 
         if not patient:
-
             return jsonify({
                 "error": "Patient not found."
             }), 404
@@ -111,10 +78,8 @@ def get_patient(patient_id):
         })
 
     except Exception:
-
-        print("\n========== GET PATIENT ERROR ==========")
+        print("\n===== /patient GET ERROR =====")
         traceback.print_exc()
-        print("=======================================\n")
 
         return jsonify({
             "error": "Could not load patient."
@@ -125,17 +90,11 @@ def get_patient(patient_id):
 # UPDATE PATIENT
 # ==========================================
 
-@app.route(
-    "/patient/<int:patient_id>",
-    methods=["PUT"]
-)
+@app.route("/patient/<int:patient_id>", methods=["PUT"])
 def update_patient(patient_id):
 
     try:
-
-        data = request.get_json(
-            silent=True
-        ) or {}
+        data = request.get_json() or {}
 
         database.update_patient(
             patient_id,
@@ -146,16 +105,12 @@ def update_patient(patient_id):
         )
 
         return jsonify({
-            "patient": database.get_patient(
-                patient_id
-            )
+            "patient": database.get_patient(patient_id)
         })
 
     except Exception:
-
-        print("\n========== UPDATE PATIENT ERROR ==========")
+        print("\n===== /patient PUT ERROR =====")
         traceback.print_exc()
-        print("==========================================\n")
 
         return jsonify({
             "error": "Could not update patient."
@@ -166,91 +121,44 @@ def update_patient(patient_id):
 # CHAT
 # ==========================================
 
-@app.route(
-    "/chat",
-    methods=["POST"]
-)
+@app.route("/chat", methods=["POST"])
 def chat():
-
-    print("\n")
-    print("==========================================")
-    print("========== CHAT REQUEST RECEIVED =========")
-    print("==========================================")
 
     try:
 
-        # ----------------------------------
-        # READ REQUEST
-        # ----------------------------------
+        data = request.get_json()
 
-        data = request.get_json(
-            silent=True
-        ) or {}
+        if not data:
+            return jsonify({
+                "reply": "Please send a message."
+            }), 400
 
-        print("Request JSON received")
-
-        user_message = (
-            data.get("message")
-            or ""
-        ).strip()
-
-        patient_id = data.get(
-            "patient_id"
-        )
-
-        conversation_id = data.get(
-            "conversation_id"
-        )
-
-        print(
-            "Message:",
-            user_message
-        )
-
-        print(
-            "Patient ID:",
-            patient_id
-        )
-
-        print(
-            "Conversation ID:",
-            conversation_id
-        )
-
-        # ----------------------------------
-        # VALIDATE MESSAGE
-        # ----------------------------------
+        user_message = (data.get("message") or "").strip()
 
         if not user_message:
-
-            print("ERROR: Empty message")
-
             return jsonify({
                 "reply": "Please enter a message."
             }), 400
 
-        # ----------------------------------
-        # CREATE GUEST PATIENT
-        # ----------------------------------
+        # Check Gemini client
+        if ai.client is None:
+            return jsonify({
+                "reply": "Gemini API key is missing. Please check your environment variable."
+            }), 500
+
+        patient_id = data.get("patient_id")
+        conversation_id = data.get("conversation_id")
+
+        # --------------------------------------
+        # CREATE GUEST PATIENT IF NEEDED
+        # --------------------------------------
 
         if not patient_id:
+            patient_id = database.create_patient()
 
-            print(
-                "Creating guest patient..."
-            )
-
-            patient_id = (
-                database.create_patient()
-            )
-
-            print(
-                "Guest patient created:",
-                patient_id
-            )
-
-        # ----------------------------------
-        # CREATE CONVERSATION
-        # ----------------------------------
+        # --------------------------------------
+        # CREATE CONVERSATION IF NEEDED
+        # --------------------------------------
 
         if not conversation_id:
 
@@ -259,50 +167,22 @@ def chat():
             if len(user_message) > 40:
                 title += "..."
 
-            print(
-                "Creating conversation..."
+            conversation_id = database.create_conversation(
+                patient_id,
+                title=title
             )
 
-            conversation_id = (
-                database.create_conversation(
-                    patient_id,
-                    title=title
-                )
-            )
-
-            print(
-                "Conversation created:",
-                conversation_id
-            )
-
-        # ----------------------------------
+        # --------------------------------------
         # LOAD PREVIOUS MESSAGES
-        # ----------------------------------
+        # --------------------------------------
 
-        print(
-            "Loading previous messages..."
+        previous_messages = database.get_conversation(
+            conversation_id
         )
 
-        previous_messages = (
-            database.get_conversation(
-                conversation_id
-            )
-        )
-
-        print(
-            "Previous messages:",
-            len(previous_messages)
-            if previous_messages
-            else 0
-        )
-
-        # ----------------------------------
+        # --------------------------------------
         # SAVE USER MESSAGE
-        # ----------------------------------
-
-        print(
-            "Saving user message..."
-        )
+        # --------------------------------------
 
         database.save_message(
             conversation_id,
@@ -310,30 +190,22 @@ def chat():
             user_message
         )
 
-        # ----------------------------------
-        # CALL GROQ
-        # ----------------------------------
+        print("\n--------------------------------")
+        print("USER:", user_message)
+        print("--------------------------------")
 
-        print(
-            "Calling Groq AI..."
-        )
+        # --------------------------------------
+        # ASK AI
+        # --------------------------------------
 
         reply = ai.get_ai_response(
             user_message,
             previous_messages
         )
 
-        print(
-            "Groq reply received."
-        )
-
-        # ----------------------------------
+        # --------------------------------------
         # SAVE AI RESPONSE
-        # ----------------------------------
-
-        print(
-            "Saving AI response..."
-        )
+        # --------------------------------------
 
         database.save_message(
             conversation_id,
@@ -341,21 +213,14 @@ def chat():
             reply
         )
 
-        # ----------------------------------
+        print("AI:", reply)
+
+        # --------------------------------------
         # EMERGENCY CHECK
-        # ----------------------------------
+        # --------------------------------------
 
         emergency = ai.check_emergency(
             user_message
-        )
-
-        print(
-            "Emergency:",
-            emergency
-        )
-
-        print(
-            "========== CHAT SUCCESS ==========\n"
         )
 
         return jsonify({
@@ -372,63 +237,164 @@ def chat():
 
     except Exception as error:
 
-        print("\n")
-        print("==========================================")
-        print("============ CHAT ERROR ==================")
-        print("==========================================")
-
-        print(
-            "ERROR TYPE:",
-            type(error).__name__
-        )
-
-        print(
-            "ERROR:",
-            str(error)
-        )
-
+        print("\n========== /chat ERROR ==========")
         traceback.print_exc()
+        print("==================================\n")
 
-        print(
-            "=========================================="
-        )
-        print(
-            "==========================================\n"
+        friendly = ai.friendly_error_message(
+            error
         )
 
         return jsonify({
-
-            "reply": ai.friendly_error_message(
-                error
-            ),
-
-            "error": str(error)
-
+            "reply": friendly
         }), 503
 
 
 # ==========================================
-# NEW CHAT
+# CHAT WITH UPLOADED REPORT IMAGE
 # ==========================================
 
-@app.route(
-    "/new-chat",
-    methods=["POST"]
-)
+@app.route("/chat-image", methods=["POST"])
+def chat_image():
+
+    try:
+
+        if "image" not in request.files:
+            return jsonify({
+                "reply": "Please attach a photo of the report."
+            }), 400
+
+        image_file = request.files["image"]
+
+        if not image_file or image_file.filename == "":
+            return jsonify({
+                "reply": "Please attach a photo of the report."
+            }), 400
+
+        user_note = (request.form.get("message") or "").strip()
+        patient_id = request.form.get("patient_id")
+        conversation_id = request.form.get("conversation_id")
+
+        # --------------------------------------
+        # SIZE / TYPE GUARD
+        # --------------------------------------
+
+        image_bytes = image_file.read()
+
+        max_size_bytes = 15 * 1024 * 1024
+
+        if len(image_bytes) > max_size_bytes:
+            return jsonify({
+                "reply": "Image is too large. Please upload a photo under 15MB."
+            }), 400
+
+        mime_type = image_file.mimetype or "image/jpeg"
+
+        if not mime_type.startswith("image/"):
+            return jsonify({
+                "reply": "Please upload a valid image file."
+            }), 400
+
+        # --------------------------------------
+        # ENCODE AS BASE64 DATA URL
+        # --------------------------------------
+
+        base64_data = base64.b64encode(image_bytes).decode("utf-8")
+        image_data_url = f"data:{mime_type};base64,{base64_data}"
+
+        # --------------------------------------
+        # CREATE PATIENT / CONVERSATION IF NEEDED
+        # --------------------------------------
+
+        if not patient_id:
+            patient_id = database.create_patient()
+        else:
+            patient_id = int(patient_id)
+
+        if not conversation_id:
+            conversation_id = database.create_conversation(
+                patient_id,
+                title="Medical report upload"
+            )
+        else:
+            conversation_id = int(conversation_id)
+
+        # --------------------------------------
+        # SAVE USER MESSAGE (with note if given)
+        # --------------------------------------
+
+        display_text = user_note if user_note else "[Uploaded a medical report photo]"
+
+        database.save_message(
+            conversation_id,
+            "patient",
+            display_text
+        )
+
+        print("\n--------------------------------")
+        print("USER uploaded a report image. Note:", user_note or "(none)")
+        print("--------------------------------")
+
+        # --------------------------------------
+        # ANALYZE IMAGE
+        # --------------------------------------
+
+        reply = ai.analyze_report_image(
+            image_data_url,
+            user_note
+        )
+
+        # --------------------------------------
+        # SAVE AI RESPONSE
+        # --------------------------------------
+
+        database.save_message(
+            conversation_id,
+            "ai",
+            reply
+        )
+
+        print("AI (image analysis):", reply)
+
+        return jsonify({
+
+            "reply": reply,
+
+            "patient_id": patient_id,
+
+            "conversation_id": conversation_id,
+
+            "emergency": False
+
+        })
+
+    except Exception as error:
+
+        print("\n===== /chat-image ERROR =====")
+        traceback.print_exc()
+        print("==============================\n")
+
+        friendly = ai.friendly_error_message(error)
+
+        return jsonify({
+            "reply": friendly
+        }), 503
+
+
+# ==========================================
+# START NEW CHAT
+# ==========================================
+
+@app.route("/new-chat", methods=["POST"])
 def new_chat():
 
     try:
 
-        data = request.get_json(
-            silent=True
-        ) or {}
+        data = request.get_json() or {}
 
-        patient_id = data.get(
-            "patient_id"
-        )
+        patient_id = data.get("patient_id")
 
         if not patient_id:
-
             return jsonify({
                 "error": "patient_id is required."
             }), 400
@@ -438,11 +404,9 @@ def new_chat():
             "New Consultation"
         )
 
-        conversation_id = (
-            database.create_conversation(
-                patient_id,
-                title=title
-            )
+        conversation_id = database.create_conversation(
+            patient_id,
+            title=title
         )
 
         return jsonify({
@@ -450,10 +414,8 @@ def new_chat():
         })
 
     except Exception:
-
-        print("\n========== NEW CHAT ERROR ==========")
+        print("\n===== /new-chat ERROR =====")
         traceback.print_exc()
-        print("====================================\n")
 
         return jsonify({
             "error": "Could not start a new chat."
@@ -461,21 +423,16 @@ def new_chat():
 
 
 # ==========================================
-# HISTORY
+# PATIENT HISTORY
 # ==========================================
 
-@app.route(
-    "/history/<int:patient_id>",
-    methods=["GET"]
-)
+@app.route("/history/<int:patient_id>", methods=["GET"])
 def history(patient_id):
 
     try:
 
-        conversations = (
-            database.get_patient_conversations(
-                patient_id
-            )
+        conversations = database.get_patient_conversations(
+            patient_id
         )
 
         return jsonify({
@@ -483,10 +440,8 @@ def history(patient_id):
         })
 
     except Exception:
-
-        print("\n========== HISTORY ERROR ==========")
+        print("\n===== /history ERROR =====")
         traceback.print_exc()
-        print("===================================\n")
 
         return jsonify({
             "error": "Could not load history."
@@ -494,21 +449,16 @@ def history(patient_id):
 
 
 # ==========================================
-# CONVERSATION
+# OPEN CONVERSATION
 # ==========================================
 
-@app.route(
-    "/conversation/<int:conversation_id>",
-    methods=["GET"]
-)
+@app.route("/conversation/<int:conversation_id>", methods=["GET"])
 def conversation(conversation_id):
 
     try:
 
-        messages = (
-            database.get_conversation(
-                conversation_id
-            )
+        messages = database.get_conversation(
+            conversation_id
         )
 
         return jsonify({
@@ -516,10 +466,8 @@ def conversation(conversation_id):
         })
 
     except Exception:
-
-        print("\n========== CONVERSATION ERROR ==========")
+        print("\n===== /conversation ERROR =====")
         traceback.print_exc()
-        print("========================================\n")
 
         return jsonify({
             "error": "Could not load conversation."
@@ -527,35 +475,25 @@ def conversation(conversation_id):
 
 
 # ==========================================
-# SUMMARY
+# HEALTH SUMMARY
 # ==========================================
 
-@app.route(
-    "/summary",
-    methods=["POST"]
-)
+@app.route("/summary", methods=["POST"])
 def summary():
 
     try:
 
-        data = request.get_json(
-            silent=True
-        ) or {}
+        data = request.get_json() or {}
 
-        patient_id = data.get(
-            "patient_id"
-        )
+        patient_id = data.get("patient_id")
 
         if not patient_id:
-
             return jsonify({
                 "error": "patient_id is required."
             }), 400
 
-        messages = (
-            database.get_patient_messages(
-                patient_id
-            )
+        messages = database.get_patient_messages(
+            patient_id
         )
 
         info = ai.extract_health_info(
@@ -568,36 +506,26 @@ def summary():
 
     except Exception as error:
 
-        print("\n========== SUMMARY ERROR ==========")
+        print("\n===== /summary ERROR =====")
         traceback.print_exc()
-        print("===================================\n")
 
         return jsonify({
-            "error": ai.friendly_error_message(
-                error
-            )
+            "error": ai.friendly_error_message(error)
         }), 503
 
 
 # ==========================================
-# REPORT
+# GENERATE HEALTH REPORT
 # ==========================================
 
-@app.route(
-    "/report",
-    methods=["POST"]
-)
+@app.route("/report", methods=["POST"])
 def generate_report():
 
     try:
 
-        data = request.get_json(
-            silent=True
-        ) or {}
+        data = request.get_json() or {}
 
-        patient_id = data.get(
-            "patient_id"
-        )
+        patient_id = data.get("patient_id")
 
         if not patient_id:
 
@@ -605,10 +533,8 @@ def generate_report():
                 "error": "Please have a conversation first."
             }), 400
 
-        messages = (
-            database.get_patient_messages(
-                patient_id
-            )
+        messages = database.get_patient_messages(
+            patient_id
         )
 
         if not messages:
@@ -617,12 +543,11 @@ def generate_report():
                 "error": "No conversation found yet for this patient."
             }), 400
 
-        report_text = (
-            report.generate_health_report(
-                messages
-            )
+        report_text = report.generate_health_report(
+            messages
         )
 
+        # Save report
         database.save_report(
             patient_id=patient_id,
             summary=report_text,
@@ -636,14 +561,12 @@ def generate_report():
 
     except Exception as error:
 
-        print("\n========== REPORT ERROR ==========")
+        print("\n========== /report ERROR ==========")
         traceback.print_exc()
-        print("==================================\n")
+        print("====================================\n")
 
         return jsonify({
-            "error": ai.friendly_error_message(
-                error
-            )
+            "error": ai.friendly_error_message(error)
         }), 503
 
 
@@ -653,14 +576,13 @@ def generate_report():
 
 if __name__ == "__main__":
 
-    print("")
-    print("==========================================")
-    print("       AI HEALTHCARE ASSISTANT")
-    print("==========================================")
+    print("\n======================================")
+    print("      AI HEALTHCARE ASSISTANT")
+    print("======================================")
     print("AI Healthcare Backend Started")
-    print("==========================================")
-    print("")
+    print("======================================\n")
 
+    # Render automatically provides PORT
     port = int(
         os.environ.get(
             "PORT",
