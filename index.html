@@ -349,23 +349,6 @@
 
 
 
-            <!-- IMAGE PREVIEW (shown when a report photo is selected) -->
-
-            <div id="imagePreviewArea" class="image-preview-area hidden">
-
-                <div class="image-preview-item">
-
-                    <img id="imagePreviewThumb" src="" alt="Selected report">
-
-                    <button id="removeImageBtn" type="button" title="Remove image">✕</button>
-
-                </div>
-
-                <span class="image-preview-label">Report photo attached</span>
-
-            </div>
-
-
             <!-- INPUT -->
 
             <div class="input-area">
@@ -397,6 +380,20 @@
                 <div id="attachMenu" class="attach-menu hidden">
                     <button id="attachGalleryBtn" type="button">🖼️ Choose from Gallery</button>
                     <button id="attachCameraBtn" type="button">📷 Take Photo</button>
+                </div>
+
+                <!-- IMAGE PREVIEW (shown right next to the text box when a photo is selected) -->
+
+                <div id="imagePreviewArea" class="image-preview-area hidden">
+
+                    <div class="image-preview-item">
+
+                        <img id="imagePreviewThumb" src="" alt="Selected report">
+
+                        <button id="removeImageBtn" type="button" title="Remove image">✕</button>
+
+                    </div>
+
                 </div>
 
                 <textarea
