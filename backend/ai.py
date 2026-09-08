@@ -270,6 +270,40 @@ def is_quota_error(error):
 
 
 # ==========================================
+# SAFETY NET: STRIP ANY LEAKED REASONING
+# ==========================================
+
+def strip_reasoning_leftovers(text):
+    """
+    Some reasoning-capable models can occasionally leak their internal
+    <think>...</think> chain-of-thought into the visible reply even when
+    reasoning is turned off. This removes any such block as a safety net
+    so the patient never sees raw model reasoning.
+    """
+
+    if not text:
+        return text
+
+    cleaned = re.sub(
+        r"<think>.*?</think>",
+        "",
+        text,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    # In case of an unclosed <think> tag (truncated output),
+    # cut everything from that point onward.
+    cleaned = re.sub(
+        r"<think>.*$",
+        "",
+        cleaned,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+
+    return cleaned.strip()
+
+
+# ==========================================
 # CHAT RESPONSE
 # ==========================================
 
@@ -330,7 +364,7 @@ def get_ai_response(user_message, previous_messages=None):
         text = response.choices[0].message.content
 
         if text:
-            return text.strip()
+            return strip_reasoning_leftovers(text.strip())
 
         raise Exception("OpenAI returned an empty response")
 
@@ -505,21 +539,34 @@ Conversation:
 def analyze_report_image(image_data_url, patient_note=""):
     """
     Takes a base64 data-url of a photo (previous medical report,
-    prescription, lab result, etc.) and returns a short, plain-language
-    explanation of what it shows.
+    prescription, lab result, etc.) and returns a short, confident,
+    plain-language explanation of what it shows.
     """
 
     instructions = (
-        "You are looking at a photo of a patient's previous medical "
-        "report, prescription, or lab test result. Read it carefully "
-        "and explain in simple, everyday language what it shows: the "
-        "key findings, any values that are outside the normal range, "
-        "and any medicines or diagnosis mentioned. Keep it short and "
-        "conversational - plain sentences, no headers, no markdown, "
-        "no bullet lists. You are not a doctor and cannot give a final "
-        "diagnosis; if something looks concerning, say so plainly and "
-        "suggest showing it to a doctor. If the image is unclear or is "
-        "not a medical document, say that honestly instead of guessing."
+        "You are a knowledgeable health assistant looking at a photo of a "
+        "patient's previous medical report, prescription, or lab result. "
+        "Read it and explain what it shows in confident, plain, everyday "
+        "language - like a knowledgeable friend summarizing it for them, "
+        "not like a transcription exercise.\n\n"
+        "Cover: what type of document this is, the diagnosis or condition "
+        "named, key medicines and what they're generally used for, and any "
+        "test values that stand out as high/low. Then briefly say what the "
+        "patient should keep in mind or ask their doctor about.\n\n"
+        "Rules:\n"
+        "- Do not think out loud, do not narrate your reading process, and "
+        "do not show uncertainty word-by-word (no 'maybe this, maybe "
+        "that'). Read it once, then answer directly and confidently.\n"
+        "- If one specific word or phrase is genuinely illegible, skip "
+        "it silently or mention it in a single short clause - never spend "
+        "more than one sentence guessing about it.\n"
+        "- No headers, no markdown, no bullet lists, no asterisks - just "
+        "clear flowing paragraphs, 4-8 sentences total.\n"
+        "- You are not a doctor and cannot give a final diagnosis; if "
+        "something looks concerning, say so plainly and suggest showing "
+        "it to a doctor.\n"
+        "- If the image is unclear or is not a medical document at all, "
+        "say that honestly in one line instead of guessing."
     )
 
     if patient_note:
@@ -543,8 +590,10 @@ def analyze_report_image(image_data_url, patient_note=""):
                     ]
                 }
             ],
-            max_tokens=400,
-            temperature=0.4
+            max_tokens=500,
+            temperature=0.4,
+            reasoning_effort="none",
+            reasoning_format="hidden"
         )
 
         if not response or not response.choices:
@@ -553,7 +602,7 @@ def analyze_report_image(image_data_url, patient_note=""):
         text = response.choices[0].message.content
 
         if text:
-            return text.strip()
+            return strip_reasoning_leftovers(text.strip())
 
         raise Exception("Model returned an empty analysis")
 
@@ -570,4 +619,5 @@ def analyze_report_image(image_data_url, patient_note=""):
 
         raise Exception(
             friendly_error_message(error)
+
         )

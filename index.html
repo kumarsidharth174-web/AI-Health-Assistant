@@ -1,613 +1,947 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>
-        AI Healthcare Assistant
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
-
-</head>
-
-
-<body>
-
-
-<!-- ================= PATIENT SETUP MODAL ================= -->
-<!-- Shown only the first time, so we know who the patient is -->
-
-<div id="profileModal" class="modal-overlay">
-
-    <div class="modal-box">
-
-        <h2>Welcome 👋</h2>
-        <p class="modal-subtitle">
-            Please tell us a bit about yourself before we start.
-            This is saved so your history is not lost.
-        </p>
-
-        <label>Full Name</label>
-        <input type="text" id="profileName" placeholder="e.g. Rohan Sharma">
-
-        <div class="modal-row">
-            <div>
-                <label>Age</label>
-                <input type="number" id="profileAge" placeholder="e.g. 28">
-            </div>
-            <div>
-                <label>Gender</label>
-                <select id="profileGender">
-                    <option value="">Select</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                </select>
-            </div>
-        </div>
-
-        <label>Phone (optional)</label>
-        <input type="text" id="profilePhone" placeholder="e.g. 98xxxxxxxx">
-
-        <button id="profileSaveBtn" class="primary-button">
-            Start Consultation
-        </button>
-
-        <button id="profileSkipBtn" class="link-button">
-            Continue as Guest
-        </button>
-
-    </div>
-
-</div>
-
-
-<!-- ================= HEADER ================= -->
-
-<header class="topbar">
-
-    <div class="brand">
-
-        <div class="brand-icon">
-            ✚
-        </div>
-
-        <div>
-
-            <h1>
-                HealthAI
-            </h1>
-
-            <span>
-                Healthcare Assistant
-            </span>
-
-        </div>
-
-    </div>
-
-
-    <div class="patient-box" id="patientBox" title="Click to edit your profile">
-
-        <div class="patient-avatar" id="patientAvatar">
-            P
-        </div>
-
-        <div>
-
-            <strong id="patientName">
-                Guest Patient
-            </strong>
-
-            <small id="patientMeta">
-                Personal Health
-            </small>
-
-        </div>
-
-    </div>
-
-</header>
-
-
-
-<!-- ================= EMERGENCY BANNER (hidden by default) ================= -->
-
-<div id="emergencyBanner" class="emergency-banner hidden">
-    🚨 <strong>This may be a medical emergency.</strong>
-    Please seek urgent professional medical care immediately or call your local emergency number.
-</div>
-
-
-
-<!-- ================= MAIN ================= -->
-
-<main class="dashboard">
-
-
-    <!-- Welcome -->
-
-    <section class="welcome-card">
-
-        <div>
-
-            <span class="small-title">
-                AI HEALTHCARE
-            </span>
-
-            <h2>
-                How can I help you today?
-            </h2>
-
-            <p>
-                Tell me about your health concern.
-                You can type or speak.
-            </p>
-
-        </div>
-
-
-        <div class="ai-orb">
-            ✦
-        </div>
-
-    </section>
-
-
-
-    <!-- Stats -->
-
-    <section class="stats">
-
-        <div class="stat-card">
-
-            <span>
-                💬
-            </span>
-
-            <div>
-
-                <small>
-                    Conversations
-                </small>
-
-                <strong id="conversationCount">
-                    0
-                </strong>
-
-            </div>
-
-        </div>
-
-
-        <div class="stat-card">
-
-            <span>
-                🩺
-            </span>
-
-            <div>
-
-                <small>
-                    Symptoms
-                </small>
-
-                <strong id="symptomStat">
-                    AI Analysis
-                </strong>
-
-            </div>
-
-        </div>
-
-
-        <div class="stat-card">
-
-            <span>
-                📋
-            </span>
-
-            <div>
-
-                <small>
-                    Health Report
-                </small>
-
-                <strong>
-                    Ready
-                </strong>
-
-            </div>
-
-        </div>
-
-
-        <div class="stat-card">
-
-            <span>
-                🔒
-            </span>
-
-            <div>
-
-                <small>
-                    Session
-                </small>
-
-                <strong>
-                    Private
-                </strong>
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-
-    <!-- ================= CONTENT ================= -->
-
-    <section class="content-grid">
-
-
-        <!-- LEFT: HISTORY -->
-
-        <aside class="history-panel">
-
-            <div class="card-header">
-                <h3>Patient History</h3>
-            </div>
-
-            <div id="historyList" class="history-list">
-                <p class="empty-note">No previous conversations yet.</p>
-            </div>
-
-        </aside>
-
-
-
-        <!-- CHAT -->
-
-        <div class="chat-card">
-
-            <div class="card-header">
-
-                <div>
-
-                    <h3>
-                        AI Consultation
-                    </h3>
-
-                    <span class="online">
-                        ● AI Assistant Online
-                    </span>
-
-                </div>
-
-
-                <button
-                    id="newChatBtn"
-                    class="small-button"
-                >
-                    + New Chat
-                </button>
-
-            </div>
-
-
-
-            <div
-                id="chatBox"
-                class="chat-box"
-            >
-
-
-                <div class="message ai-message">
-
-                    <div class="message-icon">
-                        AI
-                    </div>
-
-                    <div>
-
-                        <strong>
-                            AI Assistant
-                        </strong>
-
-                        <p>
-                            Hello! I'm your AI Healthcare
-                            Assistant. You can type your
-                            health concern or press the
-                            microphone button to speak.
-                        </p>
-
-                        <button
-                            class="speak-btn"
-                            data-text="Hello! I'm your AI Healthcare Assistant. You can type your health concern or press the microphone button to speak."
-                        >
-                            🔊 Speak
-                        </button>
-
-                    </div>
-
-                </div>
-
-
-            </div>
-
-
-
-            <!-- IMAGE PREVIEW (shown when a report photo is selected) -->
-
-            <div id="imagePreviewArea" class="image-preview-area hidden">
-
-                <div class="image-preview-item">
-
-                    <img id="imagePreviewThumb" src="" alt="Selected report">
-
-                    <button id="removeImageBtn" type="button" title="Remove image">✕</button>
-
-                </div>
-
-                <span class="image-preview-label">Report photo attached</span>
-
-            </div>
-
-
-            <!-- INPUT -->
-
-            <div class="input-area">
-
-                <button
-                    id="attachBtn"
-                    class="attach-button"
-                    title="Attach a medical report photo"
-                    type="button"
-                >
-                    📎
-                </button>
-
-                <input
-                    type="file"
-                    id="galleryInput"
-                    accept="image/*"
-                    class="hidden"
-                >
-
-                <input
-                    type="file"
-                    id="cameraInput"
-                    accept="image/*"
-                    capture="environment"
-                    class="hidden"
-                >
-
-                <div id="attachMenu" class="attach-menu hidden">
-                    <button id="attachGalleryBtn" type="button">🖼️ Choose from Gallery</button>
-                    <button id="attachCameraBtn" type="button">📷 Take Photo</button>
-                </div>
-
-                <textarea
-                    id="userInput"
-                    rows="1"
-                    placeholder="Describe your health concern..."
-                ></textarea>
-
-
-                <button
-                    id="voiceBtn"
-                    class="voice-button"
-                    title="Speak"
-                >
-                    🎤
-                </button>
-
-
-                <button
-                    id="sendBtn"
-                    class="send-button"
-                >
-                    Send
-                </button>
-
-            </div>
-
-
-            <div
-                id="voiceStatus"
-                class="voice-status"
-            ></div>
-
-
-        </div>
-
-
-
-        <!-- RIGHT PANEL -->
-
-        <aside class="side-panel">
-
-
-            <!-- Emergency -->
-
-            <div class="emergency-card">
-
-                <div class="emergency-title">
-
-                    <span>
-                        🚨
-                    </span>
-
-                    Emergency Care
-
-                </div>
-
-                <p>
-                    If you have severe chest pain,
-                    difficulty breathing, unconsciousness,
-                    severe bleeding or another emergency,
-                    seek urgent medical care.
-                </p>
-
-            </div>
-
-
-
-            <!-- Patient Health Summary -->
-
-            <div class="summary-card">
-
-                <div class="card-header">
-                    <h3>Patient Health Summary</h3>
-                    <span>Live</span>
-                </div>
-
-                <div class="summary-grid" id="summaryGrid">
-
-                    <div class="summary-item">
-                        <small>Symptoms</small>
-                        <strong data-field="symptoms">Not provided</strong>
-                    </div>
-
-                    <div class="summary-item">
-                        <small>Duration</small>
-                        <strong data-field="duration">Not provided</strong>
-                    </div>
-
-                    <div class="summary-item">
-                        <small>Temperature</small>
-                        <strong data-field="temperature">Not provided</strong>
-                    </div>
-
-                    <div class="summary-item">
-                        <small>Severity</small>
-                        <strong data-field="severity">Not provided</strong>
-                    </div>
-
-                    <div class="summary-item">
-                        <small>Medicines</small>
-                        <strong data-field="medicines">Not provided</strong>
-                    </div>
-
-                    <div class="summary-item">
-                        <small>Relevant History</small>
-                        <strong data-field="history">Not provided</strong>
-                    </div>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- Report -->
-
-            <div class="report-card">
-
-                <div class="card-header">
-
-                    <h3>
-                        Patient Report
-                    </h3>
-
-                    <span>
-                        AI
-                    </span>
-
-                </div>
-
-
-                <p>
-                    Analyze the saved conversation and
-                    create a health summary.
-                </p>
-
-
-                <button
-                    id="reportBtn"
-                    class="report-button"
-                >
-                    📊 Generate Health Report
-                </button>
-
-
-                <div
-                    id="reportBox"
-                    class="report-box"
-                >
-                </div>
-
-            </div>
-
-
-
-            <!-- Quick actions -->
-
-            <div class="quick-card">
-
-                <h3>
-                    Quick Actions
-                </h3>
-
-
-                <button
-                    class="quick-action"
-                    data-message="I want to describe my symptoms."
-                >
-                    🩺 Describe Symptoms
-                </button>
-
-
-                <button
-                    class="quick-action"
-                    data-message="I want to tell you my temperature."
-                >
-                    🌡️ Temperature
-                </button>
-
-
-                <button
-                    class="quick-action"
-                    data-message="I want to share my medical history."
-                >
-                    📋 Medical History
-                </button>
-
-
-                <button
-                    class="quick-action"
-                    id="quickReportAction"
-                >
-                    📊 Generate Report
-                </button>
-
-
-            </div>
-
-
-        </aside>
-
-
-    </section>
-
-
-</main>
-
-
-<script src="script.js"></script>
-
-</body>
-
-</html>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f3f7f7;
+    color: #172b2b;
+}
+
+
+/* ================= ANIMATIONS ================= */
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeInUp 0.35s ease;
+}
+
+@keyframes floatOrb {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+@keyframes pulseListen {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 92, 92, 0.4); }
+    70% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(255, 92, 92, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 92, 92, 0); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+}
+
+@keyframes flashUpdate {
+    0% { background: #d5f5e6; }
+    100% { background: #f6fbfa; }
+}
+
+@keyframes dotBounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-4px); opacity: 1; }
+}
+
+.shake {
+    animation: shake 0.5s ease;
+}
+
+
+/* ================= TOP BAR ================= */
+
+.topbar {
+    height: 76px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 5%;
+    border-bottom: 1px solid #e4eeee;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #c9f5e8;
+    color: #087f69;
+    font-size: 23px;
+}
+
+.brand h1 {
+    font-size: 21px;
+}
+
+.brand span {
+    font-size: 12px;
+    color: #799090;
+}
+
+.patient-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 12px;
+    transition: background 0.2s ease;
+}
+
+.patient-box:hover {
+    background: #f2f9f8;
+}
+
+.patient-box small {
+    display: block;
+    color: #829292;
+}
+
+.patient-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #bff1e2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #087f69;
+    transition: transform 0.2s ease;
+}
+
+.patient-box:hover .patient-avatar {
+    transform: scale(1.08);
+}
+
+
+/* ================= EMERGENCY BANNER ================= */
+
+.emergency-banner {
+    width: 90%;
+    max-width: 1400px;
+    margin: 18px auto 0;
+    background: #ffe7e5;
+    border: 1px solid #f3b8b3;
+    color: #9c2c22;
+    padding: 14px 20px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.hidden {
+    display: none !important;
+}
+
+
+/* ================= PROFILE MODAL ================= */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 30, 28, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    padding: 20px;
+}
+
+.modal-box {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    width: 100%;
+    max-width: 420px;
+    animation: fadeInUp 0.3s ease;
+}
+
+.modal-box h2 {
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+
+.modal-subtitle {
+    color: #6a7f7f;
+    font-size: 13px;
+    margin-bottom: 18px;
+    line-height: 1.5;
+}
+
+.modal-box label {
+    display: block;
+    font-size: 12px;
+    color: #4d6363;
+    margin: 12px 0 5px;
+    font-weight: bold;
+}
+
+.modal-box input,
+.modal-box select {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #dce8e6;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.modal-box input:focus,
+.modal-box select:focus {
+    border-color: #4ab99f;
+}
+
+.modal-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.primary-button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 13px;
+    border: none;
+    border-radius: 12px;
+    background: #087f69;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.primary-button:hover {
+    background: #0a9a80;
+    transform: translateY(-1px);
+}
+
+.link-button {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px;
+    border: none;
+    background: none;
+    color: #6a7f7f;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+
+/* ================= DASHBOARD ================= */
+
+.dashboard {
+    width: 90%;
+    max-width: 1400px;
+    margin: 25px auto;
+}
+
+
+/* ================= WELCOME ================= */
+
+.welcome-card {
+    min-height: 170px;
+    border-radius: 25px;
+    padding: 35px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(120deg, #d8fff4, #f2ffff);
+    background-size: 200% 200%;
+    animation: gradientShift 8s ease infinite;
+    border: 1px solid #ccefe5;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.small-title {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #178c75;
+    font-weight: bold;
+}
+
+.welcome-card h2 {
+    margin-top: 10px;
+    font-size: 32px;
+}
+
+.welcome-card p {
+    margin-top: 8px;
+    color: #668080;
+}
+
+.ai-orb {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    color: #087f69;
+    background: radial-gradient(circle, #9effdc, #dffff5, transparent 70%);
+    animation: floatOrb 3.5s ease-in-out infinite;
+}
+
+
+/* ================= STATS ================= */
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #e4eeee;
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(8, 127, 105, 0.08);
+}
+
+.stat-card > span {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #edf9f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-card small {
+    display: block;
+    color: #819090;
+    margin-bottom: 4px;
+}
+
+
+/* ================= CONTENT ================= */
+
+.content-grid {
+    display: grid;
+    grid-template-columns: 0.85fr 1.9fr 1.1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.chat-card,
+.report-card,
+.quick-card,
+.history-panel,
+.summary-card {
+    background: white;
+    border: 1px solid #e4eeee;
+    border-radius: 20px;
+}
+
+.chat-card {
+    min-height: 620px;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-header {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #edf1f1;
+}
+
+.card-header h3 {
+    font-size: 18px;
+}
+
+.online {
+    font-size: 12px;
+    color: #16866e;
+}
+
+
+/* ================= HISTORY PANEL ================= */
+
+.history-panel {
+    min-height: 620px;
+    padding-bottom: 15px;
+}
+
+.history-list {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 560px;
+    overflow-y: auto;
+}
+
+.empty-note {
+    color: #93a5a5;
+    font-size: 13px;
+    padding: 10px;
+}
+
+.history-item {
+    text-align: left;
+    border: 1px solid #e6efee;
+    background: #fbfefd;
+    border-radius: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.history-item:hover {
+    background: #eff9f6;
+    border-color: #bfe6db;
+    transform: translateX(2px);
+}
+
+.history-item.active {
+    background: #e2f7ee;
+    border-color: #7fd6bc;
+}
+
+.history-item strong {
+    display: block;
+    font-size: 13px;
+    color: #17342f;
+}
+
+.history-item small {
+    color: #8a9d9d;
+    font-size: 11px;
+}
+
+
+/* ================= HEALTH SUMMARY ================= */
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 16px 20px 20px;
+}
+
+.summary-item {
+    background: #f6fbfa;
+    border: 1px solid #e6f1ef;
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+
+.summary-item small {
+    display: block;
+    color: #7f9494;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+.summary-item strong {
+    font-size: 13px;
+    color: #223a37;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.value-updated {
+    animation: flashUpdate 0.9s ease;
+}
+
+
+/* ================= CHAT ================= */
+
+.chat-box {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    max-height: 470px;
+}
+
+.message {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.message-icon {
+    min-width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #d9f8ee;
+    color: #087f69;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.message p {
+    margin-top: 6px;
+    line-height: 1.55;
+    color: #526666;
+}
+
+.user-message {
+    justify-content: flex-end;
+}
+
+.user-bubble {
+    background: #e5f8f2;
+    padding: 12px 16px;
+    border-radius: 15px;
+    max-width: 75%;
+}
+
+.ai-bubble {
+    max-width: 80%;
+}
+
+.speak-btn {
+    margin-top: 9px;
+    padding: 7px 11px;
+    border: 1px solid #d8e5e3;
+    background: #f6faf9;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.speak-btn:hover {
+    background: #e9f7f3;
+    transform: translateY(-1px);
+}
+
+.speak-btn.speaking {
+    background: #bff1e2;
+    border-color: #7fd6bc;
+}
+
+/* Typing dots for "thinking" state */
+.typing-dots {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.typing-dots span {
+    width: 6px;
+    height: 6px;
+    background: #16866e;
+    border-radius: 50%;
+    display: inline-block;
+    animation: dotBounce 1.2s infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+
+/* ================= INPUT ================= */
+
+.input-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 15px;
+    border-top: 1px solid #edf1f1;
+    position: relative;
+}
+
+.input-area input,
+.input-area textarea {
+    flex: 1;
+    border: 1px solid #dce8e6;
+    border-radius: 13px;
+    padding: 13px;
+    outline: none;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s ease;
+}
+
+.input-area textarea {
+    resize: none;
+    max-height: 140px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+
+.input-area input:focus,
+.input-area textarea:focus {
+    border-color: #4ab99f;
+}
+
+.voice-button,
+.send-button {
+    border: none;
+    border-radius: 13px;
+    cursor: pointer;
+    padding: 0 17px;
+    transition: transform 0.15s ease, background 0.2s ease;
+}
+
+
+/* ==========================================
+   ATTACH BUTTON / MENU / IMAGE PREVIEW
+   ========================================== */
+
+.hidden {
+    display: none !important;
+}
+
+.attach-button {
+    border: none;
+    border-radius: 13px;
+    cursor: pointer;
+    padding: 0 14px;
+    background: #edf8f5;
+    font-size: 20px;
+    transition: transform 0.15s ease, background 0.2s ease;
+    position: relative;
+}
+
+.attach-button:hover {
+    transform: translateY(-1px);
+}
+
+.attach-menu {
+    position: absolute;
+    bottom: 60px;
+    left: 0;
+    background: white;
+    border: 1px solid #dce8e6;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+    min-width: 200px;
+}
+
+.attach-menu button {
+    background: none;
+    border: none;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #1f2d2a;
+}
+
+.attach-menu button:hover {
+    background: #edf8f5;
+}
+
+.image-preview-area {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.image-preview-item {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.image-preview-item img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 9px;
+    border: 1px solid #dce8e6;
+}
+
+.image-preview-item button {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: #d9534f;
+    color: white;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.user-image-bubble img {
+    max-width: 220px;
+    border-radius: 12px;
+    display: block;
+    margin-top: 6px;
+}
+
+.voice-button {
+    background: #edf8f5;
+    font-size: 20px;
+}
+
+.voice-button:hover,
+.send-button:hover {
+    transform: translateY(-1px);
+}
+
+.voice-button.listening {
+    background: #ffdcd8;
+    animation: pulseListen 1.2s infinite;
+}
+
+.send-button {
+    background: #087f69;
+    color: white;
+    font-weight: bold;
+}
+
+.send-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.voice-status {
+    text-align: center;
+    min-height: 25px;
+    color: #16866e;
+    font-size: 13px;
+}
+
+
+/* ================= SIDE ================= */
+
+.side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.emergency-card {
+    padding: 20px;
+    border-radius: 18px;
+    background: #fff6f5;
+    border: 1px solid #f4dddd;
+}
+
+.emergency-title {
+    font-weight: bold;
+    color: #b34444;
+    display: flex;
+    gap: 8px;
+}
+
+.emergency-card p {
+    margin-top: 10px;
+    color: #765e5e;
+    line-height: 1.5;
+    font-size: 13px;
+}
+
+.report-card {
+    padding-bottom: 18px;
+}
+
+.report-card > p {
+    padding: 15px 20px;
+    color: #697d7d;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.report-button {
+    margin: 0 20px;
+    width: calc(100% - 40px);
+    padding: 12px;
+    border: none;
+    border-radius: 11px;
+    background: #087f69;
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.report-button:hover {
+    background: #0a9a80;
+    transform: translateY(-1px);
+}
+
+.report-box {
+    margin: 15px 20px 0;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #526666;
+}
+
+.pulse-loading {
+    animation: pulseListen 1.5s infinite;
+}
+
+.quick-card {
+    padding-bottom: 15px;
+}
+
+.quick-card h3 {
+    padding: 20px;
+}
+
+.quick-action {
+    width: calc(100% - 30px);
+    margin: 5px 15px;
+    padding: 11px;
+    text-align: left;
+    border: 1px solid #e2ecea;
+    background: white;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.quick-action:hover {
+    background: #eff9f6;
+    transform: translateX(2px);
+}
+
+.small-button {
+    border: 1px solid #dce9e6;
+    background: white;
+    padding: 8px 11px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.small-button:hover {
+    background: #eff9f6;
+}
+
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 1100px) {
+
+    .content-grid {
+        grid-template-columns: 1fr 1.6fr;
+    }
+
+    .history-panel {
+        grid-column: 1 / span 2;
+        min-height: auto;
+    }
+
+    .history-list {
+        max-height: 220px;
+    }
+}
+
+@media (max-width: 900px) {
+
+    .stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .history-panel {
+        grid-column: auto;
+    }
+
+    .welcome-card h2 {
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 600px) {
+
+    .topbar {
+        padding: 0 15px;
+    }
+
+    .dashboard {
+        width: 94%;
+    }
+
+    .patient-box small {
+        display: none;
+    }
+
+    .welcome-card {
+        padding: 25px;
+    }
+
+    .ai-orb {
+        width: 70px;
+        height: 70px;
+    }
+
+    .stats {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .stat-card {
+        padding: 12px;
+    }
+
+    .chat-card {
+        min-height: 600px;
+    }
+
+    .input-area {
+        padding: 10px;
+    }
+
+    .input-area input,
+    .input-area textarea {
+        min-width: 0;
+    }
+
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
