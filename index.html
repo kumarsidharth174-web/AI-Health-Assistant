@@ -349,15 +349,61 @@
 
 
 
+            <!-- IMAGE PREVIEW (shown when a report photo is selected) -->
+
+            <div id="imagePreviewArea" class="image-preview-area hidden">
+
+                <div class="image-preview-item">
+
+                    <img id="imagePreviewThumb" src="" alt="Selected report">
+
+                    <button id="removeImageBtn" type="button" title="Remove image">✕</button>
+
+                </div>
+
+                <span class="image-preview-label">Report photo attached</span>
+
+            </div>
+
+
             <!-- INPUT -->
 
             <div class="input-area">
 
-                <input
-                    type="text"
-                    id="userInput"
-                    placeholder="Describe your health concern..."
+                <button
+                    id="attachBtn"
+                    class="attach-button"
+                    title="Attach a medical report photo"
+                    type="button"
                 >
+                    📎
+                </button>
+
+                <input
+                    type="file"
+                    id="galleryInput"
+                    accept="image/*"
+                    class="hidden"
+                >
+
+                <input
+                    type="file"
+                    id="cameraInput"
+                    accept="image/*"
+                    capture="environment"
+                    class="hidden"
+                >
+
+                <div id="attachMenu" class="attach-menu hidden">
+                    <button id="attachGalleryBtn" type="button">🖼️ Choose from Gallery</button>
+                    <button id="attachCameraBtn" type="button">📷 Take Photo</button>
+                </div>
+
+                <textarea
+                    id="userInput"
+                    rows="1"
+                    placeholder="Describe your health concern..."
+                ></textarea>
 
 
                 <button
