@@ -592,7 +592,10 @@ def analyze_report_image(image_data_url, patient_note=""):
                         ]
                     }
                 ],
-                max_tokens=500,
+                # Generous limit: leaves room even if some internal
+                # reasoning slips through before the final answer,
+                # so the real answer doesn't get cut off.
+                max_tokens=1200,
                 temperature=0.4
             )
 
@@ -602,26 +605,38 @@ def analyze_report_image(image_data_url, patient_note=""):
 
             return client.chat.completions.create(**kwargs)
 
-        try:
-            # First try with reasoning disabled explicitly.
-            response = call_vision_model(with_reasoning_params=True)
+        response = None
+        text = ""
 
-        except Exception as inner_error:
-            # Some models/accounts may not accept these extra params -
-            # fall back to a plain call so the feature still works,
-            # and rely on strip_reasoning_leftovers() as the safety net.
-            print(f"Vision call with reasoning params failed ({inner_error}), retrying plainly...")
-            response = call_vision_model(with_reasoning_params=False)
+        # Try up to 2 ways of calling the model. If the first attempt
+        # comes back empty (e.g. the model used up its output just
+        # "thinking" and never reached a final answer), retry once
+        # instead of showing the patient a blank reply.
+        for attempt, with_reasoning_params in enumerate([True, False]):
+
+            try:
+                response = call_vision_model(with_reasoning_params)
+
+            except Exception as inner_error:
+                print(f"Vision call attempt {attempt + 1} failed: {inner_error}")
+                continue
+
+            if response and response.choices:
+                raw_text = response.choices[0].message.content or ""
+                text = strip_reasoning_leftovers(raw_text.strip())
+
+            if text:
+                break
+
+            print(f"Vision call attempt {attempt + 1} returned no usable text, retrying...")
 
         if not response or not response.choices:
             raise Exception("Empty response analyzing image")
 
-        text = response.choices[0].message.content
-
         if text:
-            return strip_reasoning_leftovers(text.strip())
+            return text
 
-        raise Exception("Model returned an empty analysis")
+        raise Exception("Model returned an empty analysis after retrying")
 
     except Exception as error:
 
