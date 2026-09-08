@@ -576,25 +576,42 @@ def analyze_report_image(image_data_url, patient_note=""):
 
         print(f"Analyzing report image using: {VISION_MODEL}")
 
-        response = client.chat.completions.create(
-            model=VISION_MODEL,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": instructions},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": image_data_url}
-                        }
-                    ]
-                }
-            ],
-            max_tokens=500,
-            temperature=0.4,
-            reasoning_effort="none",
-            reasoning_format="hidden"
-        )
+        def call_vision_model(with_reasoning_params):
+
+            kwargs = dict(
+                model=VISION_MODEL,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": instructions},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": image_data_url}
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=500,
+                temperature=0.4
+            )
+
+            if with_reasoning_params:
+                kwargs["reasoning_effort"] = "none"
+                kwargs["reasoning_format"] = "hidden"
+
+            return client.chat.completions.create(**kwargs)
+
+        try:
+            # First try with reasoning disabled explicitly.
+            response = call_vision_model(with_reasoning_params=True)
+
+        except Exception as inner_error:
+            # Some models/accounts may not accept these extra params -
+            # fall back to a plain call so the feature still works,
+            # and rely on strip_reasoning_leftovers() as the safety net.
+            print(f"Vision call with reasoning params failed ({inner_error}), retrying plainly...")
+            response = call_vision_model(with_reasoning_params=False)
 
         if not response or not response.choices:
             raise Exception("Empty response analyzing image")
