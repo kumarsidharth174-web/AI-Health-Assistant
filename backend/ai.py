@@ -74,6 +74,13 @@ CONTENT RULES:
 - The patient may write in Hindi, English or Hinglish (mixed). Reply in
   the same language/style they are using — if they write in Hinglish,
   reply in Hinglish, not formal Hindi or English.
+- Sound like a warm, reassuring person, the way a caring Indian nurse or
+  health worker would talk to someone they know — calm, gentle, a little
+  personal, never robotic or alarming.
+- Do not open with scary-sounding warnings or long lists of dangerous
+  possibilities unless the situation is genuinely an emergency. Most
+  common symptoms are not emergencies, so don't make the patient more
+  anxious than they already are — reassure first, then guide.
 """
 
 
@@ -87,6 +94,13 @@ CONTENT RULES:
 MODEL = os.getenv(
     "GROQ_MODEL",
     "openai/gpt-oss-120b"
+)
+
+# Separate vision-capable model for analyzing uploaded
+# medical report photos (prescriptions, lab results, etc.)
+VISION_MODEL = os.getenv(
+    "GROQ_VISION_MODEL",
+    "qwen/qwen3.6-27b"
 )
 
 
@@ -482,3 +496,78 @@ Conversation:
         # Returning default keeps the server alive.
 
         return default
+
+
+# ==========================================
+# ANALYZE UPLOADED MEDICAL REPORT PHOTO
+# ==========================================
+
+def analyze_report_image(image_data_url, patient_note=""):
+    """
+    Takes a base64 data-url of a photo (previous medical report,
+    prescription, lab result, etc.) and returns a short, plain-language
+    explanation of what it shows.
+    """
+
+    instructions = (
+        "You are looking at a photo of a patient's previous medical "
+        "report, prescription, or lab test result. Read it carefully "
+        "and explain in simple, everyday language what it shows: the "
+        "key findings, any values that are outside the normal range, "
+        "and any medicines or diagnosis mentioned. Keep it short and "
+        "conversational - plain sentences, no headers, no markdown, "
+        "no bullet lists. You are not a doctor and cannot give a final "
+        "diagnosis; if something looks concerning, say so plainly and "
+        "suggest showing it to a doctor. If the image is unclear or is "
+        "not a medical document, say that honestly instead of guessing."
+    )
+
+    if patient_note:
+        instructions += f"\n\nThe patient also added this note: {patient_note}"
+
+    try:
+
+        print(f"Analyzing report image using: {VISION_MODEL}")
+
+        response = client.chat.completions.create(
+            model=VISION_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": instructions},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_data_url}
+                        }
+                    ]
+                }
+            ],
+            max_tokens=400,
+            temperature=0.4
+        )
+
+        if not response or not response.choices:
+            raise Exception("Empty response analyzing image")
+
+        text = response.choices[0].message.content
+
+        if text:
+            return text.strip()
+
+        raise Exception("Model returned an empty analysis")
+
+    except Exception as error:
+
+        print("===================================")
+        print("IMAGE ANALYSIS ERROR")
+        print(f"Model: {VISION_MODEL}")
+        print(f"Error: {error}")
+        print("===================================")
+
+        if is_quota_error(error):
+            raise Exception("GROQ_QUOTA_EXCEEDED")
+
+        raise Exception(
+            friendly_error_message(error)
+        )
