@@ -614,7 +614,15 @@ function pickVoice() {
         v => v.lang === "en-IN" && INDIAN_FEMALE_NAME_HINTS.test(v.name)
     );
 
-    // 2) Any en-IN voice that is NOT a known male voice
+    // 2) Chrome's "Google" voices tend to sound the most natural and
+    //    are female by default for English - prefer these next.
+    if (!selected) {
+        selected = voices.find(
+            v => /google/i.test(v.name) && /en-/i.test(v.lang) && !MALE_NAME_HINTS.test(v.name)
+        );
+    }
+
+    // 3) Any en-IN voice that is NOT a known male voice
     //    (avoids picking "Microsoft Ravi" or similar by accident)
     if (!selected) {
         selected = voices.find(
@@ -622,17 +630,17 @@ function pickVoice() {
         );
     }
 
-    // 3) Any voice with an Indian-sounding female name, any locale
+    // 4) Any voice with an Indian-sounding female name, any locale
     if (!selected) {
         selected = voices.find(v => INDIAN_FEMALE_NAME_HINTS.test(v.name));
     }
 
-    // 4) Any female-sounding English voice, any locale
+    // 5) Any female-sounding English voice, any locale
     if (!selected) {
         selected = voices.find(v => /en-/i.test(v.lang) && /female|woman/i.test(v.name));
     }
 
-    // 5) Last resort: any en-IN voice at all, even if we can't confirm
+    // 6) Last resort: any en-IN voice at all, even if we can't confirm
     //    gender - but still skip it if it's a confirmed male voice.
     if (!selected) {
         selected = voices.find(v => v.lang === "en-IN" && !MALE_NAME_HINTS.test(v.name));
@@ -652,8 +660,8 @@ function speakText(text, button) {
     const speech = new SpeechSynthesisUtterance(text);
 
     speech.lang = "en-IN";
-    speech.rate = 0.9;
-    speech.pitch = 1.1;
+    speech.rate = 0.95;
+    speech.pitch = 1.25;
 
     const selectedVoice = pickVoice();
 
