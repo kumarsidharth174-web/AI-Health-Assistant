@@ -592,16 +592,15 @@ def analyze_report_image(image_data_url, patient_note=""):
                         ]
                     }
                 ],
-                # Generous limit: leaves room even if some internal
-                # reasoning slips through before the final answer,
-                # so the real answer doesn't get cut off.
-                max_tokens=1200,
+                # Generous limit, but kept under Groq's free-tier
+                # output-tokens-per-minute cap (1000) so the request
+                # itself doesn't get rejected before it even runs.
+                max_tokens=700,
                 temperature=0.4
             )
 
             if with_reasoning_params:
                 kwargs["reasoning_effort"] = "none"
-                kwargs["reasoning_format"] = "hidden"
 
             return client.chat.completions.create(**kwargs)
 
